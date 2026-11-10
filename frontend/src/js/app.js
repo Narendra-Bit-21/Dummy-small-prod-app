@@ -352,11 +352,15 @@ class AppController {
               ${n.subject || 'Multi-channel broadcast'}
             </td>
             <td class="px-6 py-4 text-xs">
-              ${['sent', 'simulated', 'success'].includes(n.status)
+              ${(n.status === 'sent' || n.status === 'success')
                 ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
-                     <i data-lucide="check" class="w-3 h-3 mr-1"></i> ${n.status === 'simulated' ? 'Simulated' : 'Delivered'}
+                     <i data-lucide="check" class="w-3 h-3 mr-1"></i> Delivered
                    </span>`
-                : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300" title="${n.detail || ''}">
+                : n.status === 'simulated'
+                ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300" title="Simulated — credentials not configured">
+                     <i data-lucide="eye" class="w-3 h-3 mr-1"></i> Simulated
+                   </span>`
+                : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300" title="${n.detail || n.error || ''}">
                      <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> Failed
                    </span>`
               }
