@@ -20,12 +20,14 @@ class NotificationService {
       try {
         this.emailTransporter = nodemailer.createTransport({
           host: 'smtp.gmail.com',
-          port: 465,
-          secure: true,
+          port: 587,
+          secure: false,
+          requireTLS: true,
           auth: {
             user: config.gmail.user,
-            pass: config.gmail.appPassword.replace(/\s+/g, '') // strip any spaces in app password
-          }
+            pass: config.gmail.appPassword.replace(/\s+/g, '')
+          },
+          tls: { rejectUnauthorized: false }
         });
         console.log(`[NotificationService] Gmail SMTP transporter configured for ${config.gmail.user}`);
       } catch (err) {
