@@ -242,7 +242,7 @@ class NotificationService {
         const response = await axios.post(
           'https://www.fast2sms.com/dev/bulkV2',
           {
-            route: 'v3',
+            route: 'q',
             message: message.slice(0, 160),
             language: 'english',
             flash: 0,
