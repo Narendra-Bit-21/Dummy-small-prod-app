@@ -177,7 +177,7 @@ class ApiService {
    */
   async generateUpiQr(amount = 1.00, note = 'Production Verification Token') {
     const refId = `REF${Date.now().toString(36).toUpperCase()}`;
-    const vpa = 'ravi123sehravat@okhdfcbank';
+    const vpa = '8707076667@upi';
     const payeeName = 'Ravi Sehravat';
     
     // Standard NPCI UPI URI Scheme
@@ -277,18 +277,18 @@ class ApiService {
     const defaults = [
       {
         id: 1,
-        name: 'Ravi Sehravat',
-        phone: '+91 9876543210',
-        whatsapp: '+91 9876543210',
-        email: 'ravi123sehravat@gmail.com',
+        name: 'Pratishtha',
+        phone: '+91 7355062427',
+        whatsapp: '+91 7355062427',
+        email: 'pratishthavsingh123@gmail.com',
         role: 'Primary Account / Admin'
       },
       {
         id: 2,
-        name: 'Operations Team Lead',
-        phone: '+91 9811223344',
-        whatsapp: '+91 9811223344',
-        email: 'operations@example.com',
+        name: 'Ravi',
+        phone: '+91 8769030475',
+        whatsapp: '+91 8769030475',
+        email: 'kajupretty2202@gmail.com',
         role: 'Secondary Recipient / QA'
       }
     ];

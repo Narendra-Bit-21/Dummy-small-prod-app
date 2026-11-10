@@ -285,6 +285,90 @@ class PaymentService {
   /**
    * Retrieve payment transaction history
    */
+
+  /**
+   * Create Cashfree Payment Order (Alternative Gateway to Razorpay)
+   */
+  async createCashfreeOrder({ amount = 1.00, customerPhone = '8707076667', customerEmail = 'ravi123sehravat@gmail.com' }) {
+    const orderId = cf_ord__;
+    const formattedAmount = Number(amount).toFixed(2);
+
+    if (config.cashfree.isConfigured) {
+      try {
+        const baseUrl = config.cashfree.env === 'PROD'
+          ? 'https://api.cashfree.com/pg/orders'
+          : 'https://sandbox.cashfree.com/pg/orders';
+
+        const cleanPhone = customerPhone.replace(/[^0-9]/g, '').slice(-10) || '8707076667';
+        const res = await axios.post(
+          baseUrl,
+          {
+            order_id: orderId,
+            order_amount: Number(formattedAmount),
+            order_currency: 'INR',
+            customer_details: {
+              customer_id: cust_,
+              customer_phone: cleanPhone,
+              customer_email: customerEmail || 'ravi123sehravat@gmail.com',
+              customer_name: 'Customer'
+            },
+            order_meta: {
+              notify_url: 'https://example.com/api/payment/cashfree-webhook'
+            }
+          },
+          {
+            headers: {
+              'x-client-id': config.cashfree.appId,
+              'x-client-secret': config.cashfree.secretKey,
+              'x-api-version': config.cashfree.apiVersion,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        await db.createPayment({
+          order_id: orderId,
+          amount: Number(formattedAmount),
+          currency: 'INR',
+          status: 'created',
+          method: 'cashfree',
+          notes: { payment_session_id: res.data.payment_session_id }
+        });
+
+        return {
+          success: true,
+          mode: 'live_cashfree',
+          orderId: orderId,
+          paymentSessionId: res.data.payment_session_id,
+          amount: Number(formattedAmount),
+          currency: 'INR',
+          environment: config.cashfree.env
+        };
+      } catch (err) {
+        console.warn([PaymentService] Cashfree API notice: . Using simulated order.);
+      }
+    }
+
+    // Simulated Cashfree order if API keys are pending
+    await db.createPayment({
+      order_id: orderId,
+      amount: Number(formattedAmount),
+      currency: 'INR',
+      status: 'created',
+      method: 'cashfree',
+      notes: { simulated: true }
+    });
+
+    return {
+      success: true,
+      mode: 'simulated_cashfree',
+      orderId: orderId,
+      paymentSessionId: session_sim_,
+      amount: Number(formattedAmount),
+      currency: 'INR',
+      environment: 'TEST'
+    };
+  }
   async getPaymentHistory(limit = 50) {
     return await db.getPayments(limit);
   }

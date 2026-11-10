@@ -146,16 +146,16 @@ class DatabaseManager {
       console.log('[Database] Seeding initial 2 recipient records...');
       const seedRecipients = [
         {
-          name: 'Ravi Sehrawat (Primary)',
-          email: 'ravi123sehravat@gmail.com',
-          phone: '+919876543210',
-          whatsapp: '+919876543210'
+          name: 'Pratishtha',
+          email: 'pratishthavsingh123@gmail.com',
+          phone: '+917355062427',
+          whatsapp: '+917355062427'
         },
         {
-          name: 'Secondary Stakeholder',
-          email: 'secondary@example.com',
-          phone: '+919876543211',
-          whatsapp: '+919876543211'
+          name: 'Ravi',
+          email: 'kajupretty2202@gmail.com',
+          phone: '+918769030475',
+          whatsapp: '+918769030475'
         }
       ];
 

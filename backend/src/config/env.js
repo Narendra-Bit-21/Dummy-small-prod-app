@@ -10,6 +10,17 @@ const config = {
   corsOrigin: process.env.CORS_ORIGIN || '*',
   databasePath: process.env.DATABASE_PATH || path.resolve(__dirname, '../../../database/app.db'),
 
+    // Cashfree Payments
+  cashfree: {
+    appId: process.env.CASHFREE_APP_ID || '',
+    secretKey: process.env.CASHFREE_SECRET_KEY || '',
+    env: process.env.CASHFREE_ENV || 'TEST',
+    apiVersion: '2023-08-01',
+    isConfigured: Boolean(
+      process.env.CASHFREE_APP_ID &&
+      process.env.CASHFREE_SECRET_KEY
+    )
+  },
   // Razorpay
   razorpay: {
     keyId: process.env.RAZORPAY_KEY_ID || '',

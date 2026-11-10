@@ -6,6 +6,24 @@ class PaymentController {
    * POST /api/payment/create-order
    * Create Razorpay order for ₹1 (or custom amount)
    */
+
+  /**
+   * POST /api/payment/create-cashfree-order
+   * Create Cashfree order for ?1
+   */
+  async createCashfreeOrder(req, res, next) {
+    try {
+      const { amount = 1.00, customerPhone, customerEmail } = req.body;
+      const order = await paymentService.createCashfreeOrder({
+        amount,
+        customerPhone,
+        customerEmail
+      });
+      return res.status(200).json(order);
+    } catch (err) {
+      next(err);
+    }
+  }
   async createOrder(req, res, next) {
     try {
       let { amount = 1.00, currency = 'INR', receipt, notes } = req.body;

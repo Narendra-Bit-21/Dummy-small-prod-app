@@ -3,8 +3,8 @@
 
 INSERT INTO recipients (id, name, email, phone, whatsapp)
 VALUES 
-    (1, 'Ravi Sehrawat (Primary)', 'ravi123sehravat@gmail.com', '+919876543210', '+919876543210'),
-    (2, 'Operations Lead (Secondary)', 'operations@example.com', '+919876543211', '+919876543211')
+    (1, 'Pratishtha', 'pratishthavsingh123@gmail.com', '+917355062427', '+917355062427'),
+    (2, 'Ravi', 'kajupretty2202@gmail.com', '+918769030475', '+918769030475')
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     email = excluded.email,
