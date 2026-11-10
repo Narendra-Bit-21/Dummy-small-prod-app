@@ -1,0 +1,44 @@
+# Git & Version Control
+.git/
+.gitignore
+.gitattributes
+
+# Dependency caches
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment secrets & credentials
+.env
+.env.*
+!.env.example
+
+# Local SQLite databases (mounted via volume instead of baked into container)
+database/*.db
+database/*.db-wal
+database/*.db-shm
+database/*.sqlite*
+
+# Logs & scratch files
+logs/
+*.log
+brain/
+scratch/
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# OS and Editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker / Deploy artifacts
+deploy/certbot/
+certbot/

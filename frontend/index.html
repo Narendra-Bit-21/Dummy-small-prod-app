@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuickPay & Notify Studio | ₹1 Instant Payment & Notification Hub</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            },
+            amazon: {
+              orange: '#ff9900',
+              hover: '#e88b00',
+              dark: '#131921',
+              card: '#232f3e'
+            },
+            flipkart: {
+              blue: '#2874f0',
+              yellow: '#ffe500'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Razorpay Checkout SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+  <!-- QRCode.js CDN for standalone QR rendering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="src/css/styles.css">
+</head>
+
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col font-sans antialiased transition-colors duration-200">
+
+  <!-- =========================================================================
+       1. Top Navbar & Environment Bar
+       ========================================================================= -->
+  <header class="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Logo & Subtitle -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-amber-500 p-0.5 shadow-md shadow-blue-500/20">
+            <div class="w-full h-full bg-white dark:bg-slate-900 rounded-[10px] flex items-center justify-center">
+              <i data-lucide="zap" class="w-5 h-5 text-blue-600 dark:text-blue-400"></i>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-300 bg-clip-text text-transparent">QuickPay & Notify</span>
+              <span class="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">Studio</span>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">₹1 Live Verification & Multi-Channel Dispatch</p>
+          </div>
+        </div>
+
+        <!-- Center Tabs Navigation -->
+        <nav class="hidden md:flex space-x-1 border border-slate-200 dark:border-slate-800 p-1 rounded-xl bg-slate-100/70 dark:bg-slate-800/60">
+          <button id="nav-tab-checkout" class="nav-tab-active flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold text-blue-600 transition">
+            <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+            <span>₹1 Checkout</span>
+          </button>
+          <button id="nav-tab-notifications" class="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span>Notification Studio</span>
+          </button>
+          <button id="nav-tab-logs" class="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+            <span>Audit Logs</span>
+          </button>
+        </nav>
+
+        <!-- Right Controls: API Status, Env Switcher, Dark Mode -->
+        <div class="flex items-center space-x-3">
+          
+          <!-- API Health Pill -->
+          <div class="flex items-center space-x-2 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            <span id="api-status-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm"></span>
+            <span id="api-status-text" class="text-xs font-medium text-slate-600 dark:text-slate-300">Connecting...</span>
+          </div>
+
+          <!-- Environment Badge & Toggle -->
+          <button id="env-toggle-btn" class="flex items-center space-x-1.5 group cursor-pointer focus:outline-none" title="Click to switch Sandbox / Production">
+            <span id="env-badge" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+              SANDBOX (₹1 Test)
+            </span>
+          </button>
+
+          <!-- Dark / Light Theme Toggle -->
+          <button id="theme-toggle-btn" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition" title="Toggle Dark/Light Mode">
+            <span id="theme-toggle-icon">
+              <i data-lucide="moon" class="w-4 h-4"></i>
+            </span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Subbar -->
+    <div class="md:hidden flex border-t border-slate-200 dark:border-slate-800 px-4 py-2 bg-slate-50 dark:bg-slate-900/90 justify-around">
+      <button onclick="window.app.switchTab('checkout')" class="flex flex-col items-center text-xs font-medium text-blue-600">
+        <i data-lucide="shopping-bag" class="w-4 h-4 mb-0.5"></i>
+        <span>Checkout</span>
+      </button>
+      <button onclick="window.app.switchTab('notifications')" class="flex flex-col items-center text-xs font-medium text-slate-600 dark:text-slate-400">
+        <i data-lucide="send" class="w-4 h-4 mb-0.5"></i>
+        <span>Studio</span>
+      </button>
+      <button onclick="window.app.switchTab('logs')" class="flex flex-col items-center text-xs font-medium text-slate-600 dark:text-slate-400">
+        <i data-lucide="activity" class="w-4 h-4 mb-0.5"></i>
+        <span>Logs</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       Main Content Area
+       ========================================================================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- =======================================================================
+         SECTION 1: Payment Checkout Studio (₹1 Transaction)
+         ======================================================================= -->
+    <section id="section-checkout" class="space-y-6">
+
+      <!-- Trust & Banner Header -->
+      <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+        <div class="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center space-x-2 text-blue-200 text-xs font-semibold uppercase tracking-wider mb-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded bg-blue-600/60 border border-blue-400/30">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1 text-emerald-400"></i> Gateway Certified
+              </span>
+              <span>•</span>
+              <span>Amazon / Flipkart Inspired Fast Checkout</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">₹1.00 Production Verification Checkout</h1>
+            <p class="text-blue-100/80 text-sm mt-1 max-w-2xl">
+              Execute a real or test ₹1 verification charge via official Razorpay Standard Checkout or scan dynamic NPCI UPI QR code.
+            </p>
+          </div>
+          <div class="flex items-center space-x-3 bg-white/10 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/15">
+            <i data-lucide="lock" class="w-6 h-6 text-emerald-300"></i>
+            <div>
+              <div class="text-xs font-bold text-white uppercase tracking-wider">256-Bit SSL Encrypted</div>
+              <div class="text-[11px] text-blue-200">Bank-Grade Razorpay & NPCI Rail</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Amazon/Flipkart Layout Grid: 2 Columns on Desktop -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left / Center: Payment Methods & Configuration (8 Cols) -->
+        <div class="lg:col-span-8 space-y-6">
+          
+          <!-- Step 1: Select Payment Method Card -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div class="flex items-center space-x-3">
+                <span class="flex items-center justify-center w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
+                <h2 class="text-lg font-bold">Select Payment Method</h2>
+              </div>
+              <span class="text-xs text-slate-500 dark:text-slate-400">Guaranteed Instant Settlement</span>
+            </div>
+
+            <!-- Payment Method Tabs -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+              
+              <!-- Tab 1: Razorpay Gateway -->
+              <button id="method-razorpay-btn" class="flex items-start p-4 rounded-xl border-2 border-blue-600 bg-blue-50/50 dark:bg-blue-900/20 text-left transition relative">
+                <div class="p-2 rounded-lg bg-blue-600 text-white mr-3 flex-shrink-0">
+                  <i data-lucide="credit-card" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="font-bold text-sm">Razorpay Checkout</span>
+                    <span class="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 px-1.5 py-0.2 rounded font-semibold">Recommended</span>
+                  </div>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    UPI, Credit/Debit Card, NetBanking, and Wallets in official popup.
+                  </p>
+                </div>
+              </button>
+
+              <!-- Tab 2: Direct Dynamic UPI QR -->
+              <button id="method-upiqr-btn" class="flex items-start p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900 text-left transition">
+                <div class="p-2 rounded-lg bg-slate-800 dark:bg-slate-700 text-white mr-3 flex-shrink-0">
+                  <i data-lucide="qr-code" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="font-bold text-sm">Dynamic UPI QR</span>
+                    <span class="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 rounded font-semibold">Live 5-Min Timer</span>
+                  </div>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Instant NPCI QR for Google Pay, PhonePe, and Paytm deep-links.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <!-- View 1: Razorpay Gateway View -->
+            <div id="razorpay-method-view" class="mt-6 space-y-4">
+              <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                <div class="flex items-center justify-between mb-3">
+                  <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Accepted Payment Instruments</span>
+                  <span class="text-xs font-mono text-emerald-600 dark:text-emerald-400 flex items-center">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5 mr-1"></i> Auto-verification Active
+                  </span>
+                </div>
+                <!-- Channel Badges -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                  <div class="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center space-x-1.5">
+                    <i data-lucide="smartphone" class="w-4 h-4 text-emerald-500"></i>
+                    <span>UPI & QR</span>
+                  </div>
+                  <div class="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center space-x-1.5">
+                    <i data-lucide="credit-card" class="w-4 h-4 text-blue-500"></i>
+                    <span>Cards (Visa/MC)</span>
+                  </div>
+                  <div class="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center space-x-1.5">
+                    <i data-lucide="landmark" class="w-4 h-4 text-indigo-500"></i>
+                    <span>Netbanking</span>
+                  </div>
+                  <div class="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center space-x-1.5">
+                    <i data-lucide="wallet" class="w-4 h-4 text-amber-500"></i>
+                    <span>Wallets</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Razorpay CTA Button -->
+              <div class="pt-2 flex flex-col sm:flex-row gap-3">
+                <button id="btn-pay-razorpay" class="flex-1 py-3.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-600/20 flex items-center justify-center transition cursor-pointer">
+                  <i data-lucide="lock" class="w-4 h-4 mr-2"></i>
+                  <span>Pay ₹1.00 via Razorpay Standard</span>
+                </button>
+                <button id="btn-simulate-payment" class="py-3.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition flex items-center justify-center" title="Instant test payment without popup">
+                  <i data-lucide="zap" class="w-4 h-4 mr-1 text-amber-500"></i>
+                  <span>Test Auth Simulation</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- View 2: Dynamic UPI QR Code View -->
+            <div id="upiqr-method-view" class="mt-6 space-y-5 hidden">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Dynamic NPCI UPI QR Generator</h3>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">Scan using any UPI app or click deep-links below.</p>
+                </div>
+                <button id="btn-generate-upi" class="px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 text-xs font-semibold flex items-center transition">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i> Regenerate QR
+                </button>
+              </div>
+
+              <!-- QR Display Box -->
+              <div id="upi-qr-display" class="p-6 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-center">
+                
+                <!-- QR Frame with Corner Brackets -->
+                <div class="qr-container mx-auto">
+                  <div class="qr-corner qr-corner-tl"></div>
+                  <div class="qr-corner qr-corner-tr"></div>
+                  <div class="qr-corner qr-corner-bl"></div>
+                  <div class="qr-corner qr-corner-br"></div>
+                  <div class="qr-scan-line"></div>
+
+                  <!-- Canvas for QRCode.js -->
+                  <div id="upi-qrcode-canvas" class="flex items-center justify-center min-w-[180px] min-h-[180px]"></div>
+                  <img id="upi-qr-image" class="hidden w-[180px] h-[180px] mx-auto" alt="UPI QR">
+                </div>
+
+                <!-- Timer & Reference -->
+                <div class="mt-4 max-w-xs mx-auto space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-500 dark:text-slate-400">QR Session Validity:</span>
+                    <span id="upi-timer-text" class="font-mono font-bold text-blue-600 dark:text-blue-400">05:00</span>
+                  </div>
+                  <!-- Animated Progress bar -->
+                  <div class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div id="upi-timer-progress" class="h-full bg-emerald-500 transition-all duration-1000" style="width: 100%;"></div>
+                  </div>
+                  <div class="text-[11px] text-slate-500">
+                    Ref ID: <span id="upi-ref-text" class="font-mono font-semibold text-slate-700 dark:text-slate-300">REF-INIT</span>
+                  </div>
+                </div>
+
+                <!-- UPI Link & Copy -->
+                <div class="mt-4 flex items-center max-w-md mx-auto space-x-2">
+                  <input id="upi-string-input" type="text" readonly class="flex-1 px-3 py-2 text-xs font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 focus:outline-none" value="upi://pay?pa=ravi123sehravat@okhdfcbank...">
+                  <button id="btn-copy-upi" class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-xs font-semibold flex items-center transition" title="Copy raw UPI URI">
+                    <i data-lucide="copy" class="w-3.5 h-3.5 mr-1"></i> Copy
+                  </button>
+                </div>
+
+                <!-- Deep-Link UPI App Buttons -->
+                <div class="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700/60">
+                  <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2.5">
+                    Open Directly in Installed App (Mobile / Supported OS):
+                  </div>
+                  <div class="flex flex-wrap justify-center gap-2">
+                    <button id="btn-app-gpay" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-blue-500 text-xs font-semibold flex items-center shadow-sm transition">
+                      <span class="w-2 h-2 rounded-full bg-blue-500 mr-1.5"></span> Google Pay
+                    </button>
+                    <button id="btn-app-phonepe" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-purple-500 text-xs font-semibold flex items-center shadow-sm transition">
+                      <span class="w-2 h-2 rounded-full bg-purple-600 mr-1.5"></span> PhonePe
+                    </button>
+                    <button id="btn-app-paytm" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-sky-500 text-xs font-semibold flex items-center shadow-sm transition">
+                      <span class="w-2 h-2 rounded-full bg-sky-500 mr-1.5"></span> Paytm
+                    </button>
+                    <button id="btn-app-bhim" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-orange-500 text-xs font-semibold flex items-center shadow-sm transition">
+                      <span class="w-2 h-2 rounded-full bg-orange-500 mr-1.5"></span> BHIM / Any UPI
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Simulation Trigger for QR -->
+                <div class="mt-5">
+                  <button id="btn-simulate-qr-scan" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition flex items-center justify-center mx-auto cursor-pointer">
+                    <i data-lucide="check-circle" class="w-4 h-4 mr-1.5"></i>
+                    <span>Simulate Mobile QR Scan Complete</span>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right: Flipkart/Amazon Order Summary Card (4 Cols) -->
+        <div class="lg:col-span-4 space-y-6">
+          
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm sticky top-24">
+            
+            <div class="pb-4 border-b border-slate-100 dark:border-slate-800">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Order Summary</span>
+              <h3 class="text-base font-extrabold mt-0.5 text-slate-900 dark:text-white">Price Details (1 Item)</h3>
+            </div>
+
+            <!-- Product Pill -->
+            <div class="py-4 border-b border-slate-100 dark:border-slate-800 flex items-start space-x-3">
+              <div class="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400 flex-shrink-0">
+                <i data-lucide="badge-percent" class="w-6 h-6"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">Production Verification Token</h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">SKU: PROD-VERIFY-001</p>
+                <div class="flex items-center space-x-1 mt-1">
+                  <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.2 rounded">Instant Auth</span>
+                  <span class="text-[10px] text-slate-400">• Qty: 1</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Price Breakdown -->
+            <div class="py-4 space-y-2 text-xs border-b border-slate-100 dark:border-slate-800">
+              <div class="flex justify-between">
+                <span class="text-slate-500 dark:text-slate-400">Base Token Price</span>
+                <span class="font-medium text-slate-700 dark:text-slate-300">₹0.85</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-500 dark:text-slate-400">GST (18% Integrated)</span>
+                <span class="font-medium text-slate-700 dark:text-slate-300">₹0.15</span>
+              </div>
+              <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
+                <span>Delivery & Verification</span>
+                <span class="font-bold uppercase text-[10px] bg-emerald-50 dark:bg-emerald-950 px-1 rounded">FREE</span>
+              </div>
+            </div>
+
+            <!-- Total Payable -->
+            <div class="py-4 flex justify-between items-baseline">
+              <div>
+                <div class="text-sm font-extrabold text-slate-900 dark:text-white">Total Amount</div>
+                <div class="text-[11px] text-slate-400">Inclusive of all taxes</div>
+              </div>
+              <div class="text-2xl font-black text-blue-600 dark:text-blue-400">
+                ₹1.00
+              </div>
+            </div>
+
+            <!-- Safe Payment Assurance Badges -->
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <div class="flex items-center space-x-2 text-[11px] text-slate-500 dark:text-slate-400">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 flex-shrink-0"></i>
+                <span>Automated webhook verification ready</span>
+              </div>
+              <div class="flex items-center space-x-2 text-[11px] text-slate-500 dark:text-slate-400">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 flex-shrink-0"></i>
+                <span>Instant digital receipt generation</span>
+              </div>
+              <div class="flex items-center space-x-2 text-[11px] text-slate-500 dark:text-slate-400">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 flex-shrink-0"></i>
+                <span>Auto-bridges to Notification Studio</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- =======================================================================
+         SECTION 2: Multi-Channel Notification Dispatcher
+         ======================================================================= -->
+    <section id="section-notifications" class="space-y-6 hidden">
+
+      <!-- Sender Info Banner -->
+      <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+        <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center space-x-2 text-indigo-300 text-xs font-semibold uppercase tracking-wider mb-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded bg-indigo-800/60 border border-indigo-400/30">
+                <i data-lucide="mail" class="w-3.5 h-3.5 mr-1 text-emerald-400"></i> Dispatch Engine
+              </span>
+              <span>•</span>
+              <span>Multi-Channel Studio</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Notification & Messaging Studio</h1>
+            <p class="text-indigo-200/80 text-sm mt-1 max-w-2xl">
+              Dispatch parallel notifications via verified Gmail SMTP, WhatsApp Cloud/Twilio API, and Transactional SMS Gateway.
+            </p>
+          </div>
+          
+          <!-- Verified Sender Box -->
+          <div class="bg-white/10 backdrop-blur-sm px-4 py-3 rounded-xl border border-white/15">
+            <div class="text-[10px] uppercase font-bold text-indigo-300 tracking-wider">Sender Identity</div>
+            <div class="text-sm font-mono font-bold text-white">ravi123sehravat@gmail.com</div>
+            <div class="flex items-center space-x-2 mt-1">
+              <span class="inline-flex items-center text-[10px] text-emerald-300">
+                <i data-lucide="check" class="w-3 h-3 mr-0.5"></i> Gmail SMTP
+              </span>
+              <span class="inline-flex items-center text-[10px] text-emerald-300">
+                <i data-lucide="check" class="w-3 h-3 mr-0.5"></i> WhatsApp
+              </span>
+              <span class="inline-flex items-center text-[10px] text-emerald-300">
+                <i data-lucide="check" class="w-3 h-3 mr-0.5"></i> SMS
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recipient Management Card: 2 Pre-Loaded Slots -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
+          <div>
+            <div class="flex items-center space-x-2">
+              <i data-lucide="users" class="w-5 h-5 text-blue-600"></i>
+              <h2 class="text-lg font-bold">Recipient Address Book (2 Slots)</h2>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Target endpoints for multi-channel broadcasts. Update contact credentials and save changes.
+            </p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button id="btn-reset-recipients" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+              Reset Defaults
+            </button>
+            <button id="btn-save-recipients" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center shadow-sm transition">
+              <i data-lucide="save" class="w-3.5 h-3.5 mr-1.5"></i> Save Recipient Details
+            </button>
+          </div>
+        </div>
+
+        <!-- 2 Recipient Columns Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-5">
+          
+          <!-- Recipient 1 Slot -->
+          <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+              <div class="flex items-center space-x-2">
+                <span class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">1</span>
+                <span id="rec1-display-name" class="font-bold text-sm text-slate-800 dark:text-slate-200">Ravi Sehravat</span>
+              </div>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                Primary Slot
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 text-xs">
+              <div>
+                <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Full Name</label>
+                <input id="rec1-name" type="text" class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:outline-none" value="Ravi Sehravat">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Phone Number (SMS)</label>
+                <input id="rec1-phone" type="tel" class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:outline-none" value="+91 9876543210">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">WhatsApp Number</label>
+                <input id="rec1-whatsapp" type="tel" class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:outline-none" value="+91 9876543210">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Email Address</label>
+                <input id="rec1-email" type="email" class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:outline-none" value="ravi123sehravat@gmail.com">
+              </div>
+            </div>
+          </div>
+
+          <!-- Recipient 2 Slot -->
+          <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+              <div class="flex items-center space-x-2">
+                <span class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">2</span>
+                <span id="rec2-display-name" class="font-bold text-sm text-slate-800 dark:text-slate-200">Operations Team / QA Lead</span>
+              </div>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                Secondary Slot
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 text-xs">
+              <div>
+                <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Full Name</label>
+                <input id="rec2-name" type="text" class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:outline-none" value="Operations Team / QA Lead">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Phone Number (SMS)</label>
+                <input id="rec2-phone" type="tel" class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:outline-none" value="+91 9811223344">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">WhatsApp Number</label>
+                <input id="rec2-whatsapp" type="tel" class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:outline-none" value="+91 9811223344">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Email Address</label>
+                <input id="rec2-email" type="email" class="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:outline-none" value="operations@example.com">
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Message Composer & Channel Selector: 2 Columns Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left: Composer Box (8 Cols) -->
+        <div class="lg:col-span-8 bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="edit-3" class="w-5 h-5 text-blue-600"></i>
+              <h3 class="text-base font-bold">Message Composer</h3>
+            </div>
+
+            <!-- Quick Template Buttons -->
+            <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+              <span class="text-xs text-slate-400 mr-1 hidden sm:inline">Templates:</span>
+              <button id="tpl-btn-payment" class="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 text-xs font-semibold transition">
+                Payment ₹1
+              </button>
+              <button id="tpl-btn-hello" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition">
+                Hello Test
+              </button>
+              <button id="tpl-btn-alert" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/60 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 text-xs font-semibold transition">
+                Urgent Alert
+              </button>
+              <button id="tpl-btn-clear" class="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" title="Clear">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Subject Input (For Email) -->
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
+              Subject Line <span class="text-slate-400 font-normal">(Used for Email and rich notifications)</span>
+            </label>
+            <input id="msg-subject" type="text" placeholder="e.g. ✅ Payment Confirmation: ₹1.00 - Production Verification Token" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-sm focus:border-blue-500 focus:outline-none">
+          </div>
+
+          <!-- Placeholder Tags Toolbar -->
+          <div class="flex items-center space-x-2 text-xs">
+            <span class="text-slate-400">Insert tag:</span>
+            <button data-tag="{name}" class="tag-insert-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono font-medium text-blue-600 dark:text-blue-400 transition">
+              {name}
+            </button>
+            <button data-tag="{time}" class="tag-insert-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono font-medium text-blue-600 dark:text-blue-400 transition">
+              {time}
+            </button>
+            <button data-tag="{amount}" class="tag-insert-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono font-medium text-blue-600 dark:text-blue-400 transition">
+              {amount}
+            </button>
+            <button data-tag="{status}" class="tag-insert-btn px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-mono font-medium text-blue-600 dark:text-blue-400 transition">
+              {status}
+            </button>
+          </div>
+
+          <!-- Message Body Textarea -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label class="block text-xs font-bold text-slate-600 dark:text-slate-400">
+                Message Content
+              </label>
+              <span id="msg-char-count" class="text-[11px] text-slate-400 font-mono">0 characters</span>
+            </div>
+            <textarea id="msg-body" rows="6" placeholder="Hi {name}, your transaction of {amount} has been verified..." class="w-full p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-sm focus:border-blue-500 focus:outline-none resize-y"></textarea>
+          </div>
+
+          <!-- Live Interpolated Preview -->
+          <div class="p-3.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
+            <div class="flex items-center space-x-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
+              <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+              <span>Live Interpolation Preview (Recipient 1: Ravi Sehravat)</span>
+            </div>
+            <div id="msg-preview-box">
+              <em class="text-xs text-slate-400">Start typing in the composer to view live preview...</em>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right: Channel Selector & Dispatch Trigger (4 Cols) -->
+        <div class="lg:col-span-4 space-y-6">
+          
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            
+            <div class="pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 class="text-base font-bold">Delivery Channels</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Select active routes for parallel dispatch.</p>
+            </div>
+
+            <!-- Channel Checkboxes -->
+            <div class="space-y-3">
+              
+              <!-- Channel 1: Email -->
+              <label class="flex items-start p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition">
+                <input id="channel-chk-email" type="checkbox" checked class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                <div class="ml-3">
+                  <div class="flex items-center space-x-1.5">
+                    <i data-lucide="mail" class="w-4 h-4 text-indigo-500"></i>
+                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">Email Broadcast</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">via Gmail SMTP (ravi123sehravat@gmail.com)</p>
+                </div>
+              </label>
+
+              <!-- Channel 2: WhatsApp -->
+              <label class="flex items-start p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition">
+                <input id="channel-chk-whatsapp" type="checkbox" checked class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                <div class="ml-3">
+                  <div class="flex items-center space-x-1.5">
+                    <i data-lucide="message-circle" class="w-4 h-4 text-emerald-500"></i>
+                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">WhatsApp Notification</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">via Twilio / Meta WhatsApp Cloud API</p>
+                </div>
+              </label>
+
+              <!-- Channel 3: SMS -->
+              <label class="flex items-start p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition">
+                <input id="channel-chk-sms" type="checkbox" checked class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                <div class="ml-3">
+                  <div class="flex items-center space-x-1.5">
+                    <i data-lucide="smartphone" class="w-4 h-4 text-sky-500"></i>
+                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">SMS Gateway</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">via High-speed Transactional SMS Route</p>
+                </div>
+              </label>
+
+            </div>
+
+            <!-- Dispatch Parallel Trigger Button -->
+            <div class="pt-2">
+              <button id="btn-dispatch-all" class="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-sm shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 transition cursor-pointer">
+                <i data-lucide="send" class="w-5 h-5"></i>
+                <span>🚀 Dispatch to Both Recipients (Parallel)</span>
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Live Progress & Status Matrix Card -->
+      <div id="dispatch-status-card" class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 hidden">
+        
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="gauge" class="w-5 h-5 text-indigo-600"></i>
+            <h3 class="text-base font-bold">Parallel Delivery Matrix & Progress</h3>
+          </div>
+          <span class="text-xs font-mono text-slate-400">Target Count: 2 Recipients × 3 Channels</span>
+        </div>
+
+        <!-- 2 Recipients Status Matrix Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="text-[11px] uppercase bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400">
+              <tr>
+                <th class="px-4 py-2.5 rounded-l-lg">Recipient</th>
+                <th class="px-4 py-2.5">Email (Gmail)</th>
+                <th class="px-4 py-2.5">WhatsApp</th>
+                <th class="px-4 py-2.5 rounded-r-lg">SMS Gateway</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+              <!-- Recipient 1 Row -->
+              <tr>
+                <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">
+                  <div>Ravi Sehravat</div>
+                  <div class="text-[10px] text-slate-400 font-mono">ravi123sehravat@gmail.com</div>
+                </td>
+                <td class="px-4 py-3" id="matrix-r1-email">
+                  <span class="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">Idle</span>
+                </td>
+                <td class="px-4 py-3" id="matrix-r1-whatsapp">
+                  <span class="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">Idle</span>
+                </td>
+                <td class="px-4 py-3" id="matrix-r1-sms">
+                  <span class="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">Idle</span>
+                </td>
+              </tr>
+              <!-- Recipient 2 Row -->
+              <tr>
+                <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">
+                  <div>Operations Team / QA Lead</div>
+                  <div class="text-[10px] text-slate-400 font-mono">operations@example.com</div>
+                </td>
+                <td class="px-4 py-3" id="matrix-r2-email">
+                  <span class="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">Idle</span>
+                </td>
+                <td class="px-4 py-3" id="matrix-r2-whatsapp">
+                  <span class="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">Idle</span>
+                </td>
+                <td class="px-4 py-3" id="matrix-r2-sms">
+                  <span class="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">Idle</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Live Console Progress Log -->
+        <div class="pt-3">
+          <div class="text-xs font-semibold text-slate-500 mb-1.5 flex items-center space-x-1">
+            <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
+            <span>Real-time Dispatch Log:</span>
+          </div>
+          <div id="dispatch-progress-log" class="p-3 rounded-xl bg-slate-950 text-slate-200 max-h-36 overflow-y-auto space-y-1 font-mono text-xs">
+            <div class="text-slate-500">[STANDBY] Ready for broadcast...</div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- =======================================================================
+         SECTION 3: Live Activity & Audit Log
+         ======================================================================= -->
+    <section id="section-logs" class="space-y-6 hidden">
+      
+      <!-- Top Bar: Filters, Subtabs & Export -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-extrabold tracking-tight">Audit & Transaction History</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Real-time gateway receipts, webhooks, and multi-channel dispatch logs.</p>
+          </div>
+
+          <!-- Actions: Export CSV & Clear -->
+          <div class="flex items-center space-x-2">
+            <button id="btn-export-csv" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold flex items-center transition">
+              <i data-lucide="download" class="w-4 h-4 mr-1.5 text-blue-500"></i> Export CSV
+            </button>
+            <button id="btn-clear-logs" class="px-3 py-2 rounded-xl border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-semibold text-red-600 dark:text-red-400 flex items-center transition" title="Clear All History">
+              <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Subbar -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+          
+          <!-- Subtabs (Payments vs Notifications) -->
+          <div class="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-full sm:w-auto">
+            <button id="subtab-history-payments" class="flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 shadow-sm text-blue-600 transition">
+              💳 Payment Transactions
+            </button>
+            <button id="subtab-history-notifs" class="flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition">
+              📬 Notification Dispatches
+            </button>
+          </div>
+
+          <!-- Search & Filter Controls -->
+          <div class="flex items-center space-x-2 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-64">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+              <input id="history-search" type="text" placeholder="Search by ID, recipient, status..." class="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none">
+            </div>
+            <select id="history-status-filter" class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 focus:outline-none">
+              <option value="all">All Statuses</option>
+              <option value="success">Success</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Table 1: Payments View -->
+      <div id="table-payments-view" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
+                <th class="px-6 py-3.5">Receipt / Txn ID</th>
+                <th class="px-6 py-3.5">Timestamp</th>
+                <th class="px-6 py-3.5">Method</th>
+                <th class="px-6 py-3.5">Amount</th>
+                <th class="px-6 py-3.5">Status</th>
+                <th class="px-6 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="payments-tbody" class="divide-y divide-slate-100 dark:divide-slate-800">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Table 2: Notifications View -->
+      <div id="table-notifs-view" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
+                <th class="px-6 py-3.5">Time</th>
+                <th class="px-6 py-3.5">Recipient</th>
+                <th class="px-6 py-3.5">Channel</th>
+                <th class="px-6 py-3.5">Subject / Message</th>
+                <th class="px-6 py-3.5">Status</th>
+                <th class="px-6 py-3.5">Delivery Details</th>
+              </tr>
+            </thead>
+            <tbody id="notifs-tbody" class="divide-y divide-slate-100 dark:divide-slate-800">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- =========================================================================
+       Receipt & Transaction Modal
+       ========================================================================= -->
+  <div id="receipt-modal" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm hidden items-center justify-center p-4 transition-all">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="receipt" class="w-5 h-5 text-emerald-300"></i>
+          <h3 class="font-bold text-base">Payment Receipt Confirmation</h3>
+        </div>
+        <button id="receipt-modal-close" class="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Printable Content Card -->
+      <div id="printable-receipt-card" class="p-6 space-y-4">
+        
+        <!-- Status Banner -->
+        <div class="text-center py-3 bg-emerald-50 dark:bg-emerald-950/50 rounded-xl border border-emerald-200 dark:border-emerald-800">
+          <div class="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center mb-1">
+            <i data-lucide="check" class="w-6 h-6"></i>
+          </div>
+          <div class="font-extrabold text-sm text-emerald-700 dark:text-emerald-300">PAYMENT VERIFIED & CONFIRMED</div>
+          <div class="text-xs text-slate-500 mt-0.5">Automated Gateway Settlement Verified</div>
+        </div>
+
+        <!-- Receipt Metadata Table -->
+        <div class="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+          <div class="py-2 flex justify-between">
+            <span class="text-slate-500">Receipt No:</span>
+            <span id="receipt-id" class="font-mono font-bold text-slate-800 dark:text-slate-200">REC-XXXXX</span>
+          </div>
+          <div class="py-2 flex justify-between">
+            <span class="text-slate-500">Payment ID:</span>
+            <span id="receipt-payment-id" class="font-mono text-slate-700 dark:text-slate-300">pay_xxxx</span>
+          </div>
+          <div class="py-2 flex justify-between">
+            <span class="text-slate-500">Order ID:</span>
+            <span id="receipt-order-id" class="font-mono text-slate-700 dark:text-slate-300">order_xxxx</span>
+          </div>
+          <div class="py-2 flex justify-between">
+            <span class="text-slate-500">Item Description:</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-200">Production Verification Token (1 Unit)</span>
+          </div>
+          <div class="py-2 flex justify-between">
+            <span class="text-slate-500">Method:</span>
+            <span id="receipt-method" class="font-medium text-slate-800 dark:text-slate-200">Razorpay Standard</span>
+          </div>
+          <div class="py-2 flex justify-between">
+            <span class="text-slate-500">Date & Time:</span>
+            <span id="receipt-timestamp" class="text-slate-700 dark:text-slate-300">-</span>
+          </div>
+          <div class="py-2.5 flex justify-between items-baseline font-bold text-sm">
+            <span>Total Amount Paid:</span>
+            <span id="receipt-amount" class="text-blue-600 dark:text-blue-400 text-base font-extrabold">₹1.00</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer Buttons (Hidden during window.print()) -->
+      <div class="no-print px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2 justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <button id="receipt-print-btn" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 transition flex items-center">
+            <i data-lucide="printer" class="w-3.5 h-3.5 mr-1"></i> Print
+          </button>
+          <button id="receipt-download-btn" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 transition flex items-center">
+            <i data-lucide="download" class="w-3.5 h-3.5 mr-1"></i> Download
+          </button>
+        </div>
+        <button id="receipt-notify-btn" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition flex items-center">
+          <i data-lucide="send" class="w-3.5 h-3.5 mr-1.5"></i>
+          <span>Dispatch Notice to Recipients</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       Floating Toast Notifications Container
+       ========================================================================= -->
+  <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col space-y-3 pointer-events-none max-w-sm w-full"></div>
+
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 py-4">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 dark:text-slate-400">
+      <span>QuickPay & Notify Studio • Powered by Razorpay Standard Checkout & Multi-Channel Dispatch Engine</span>
+      <span class="mx-2">•</span>
+      <span>Sender: <strong class="text-slate-700 dark:text-slate-300 font-mono">ravi123sehravat@gmail.com</strong></span>
+    </div>
+  </footer>
+
+  <!-- Application Scripts -->
+  <script src="src/js/api.js"></script>
+  <script src="src/js/payment.js"></script>
+  <script src="src/js/notifications.js"></script>
+  <script src="src/js/app.js"></script>
+</body>
+</html>

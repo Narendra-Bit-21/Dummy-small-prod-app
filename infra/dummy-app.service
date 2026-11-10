@@ -1,0 +1,28 @@
+[Unit]
+Description=QuickPay and Notify Studio Containerized Stack
+Documentation=https://github.com/your-username/Dummy-small-prod-app
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/ubuntu/Dummy-small-prod-app
+
+# Pull and start services on system startup
+ExecStart=/usr/bin/docker compose -f /home/ubuntu/Dummy-small-prod-app/deploy/docker-compose.yml up -d --remove-orphans
+
+# Stop services cleanly on shutdown
+ExecStop=/usr/bin/docker compose -f /home/ubuntu/Dummy-small-prod-app/deploy/docker-compose.yml down
+
+# Reload services cleanly
+ExecReload=/usr/bin/docker compose -f /home/ubuntu/Dummy-small-prod-app/deploy/docker-compose.yml restart
+
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

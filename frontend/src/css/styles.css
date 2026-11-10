@@ -1,0 +1,271 @@
+/* ==========================================================================
+   QuickPay & Notify Studio - Modern Responsive Stylesheet
+   ========================================================================== */
+
+/* Typography & Base Reset */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --amazon-orange: #ff9900;
+  --amazon-dark: #131921;
+  --flipkart-blue: #2874f0;
+  --flipkart-yellow: #ffe500;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+/* Glassmorphism Accents */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+/* Pulse Glows */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px -3px rgba(37, 99, 235, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px 2px rgba(37, 99, 235, 0.7);
+  }
+}
+.glow-primary {
+  animation: pulseGlow 2.5s infinite;
+}
+
+/* QR Code Scanner Overlay effect */
+.qr-container {
+  position: relative;
+  display: inline-block;
+  padding: 1rem;
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.qr-corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: #2563eb;
+  pointer-events: none;
+}
+.qr-corner-tl {
+  top: 6px;
+  left: 6px;
+  border-top: 3px solid #2563eb;
+  border-left: 3px solid #2563eb;
+  border-top-left-radius: 6px;
+}
+.qr-corner-tr {
+  top: 6px;
+  right: 6px;
+  border-top: 3px solid #2563eb;
+  border-right: 3px solid #2563eb;
+  border-top-right-radius: 6px;
+}
+.qr-corner-bl {
+  bottom: 6px;
+  left: 6px;
+  border-bottom: 3px solid #2563eb;
+  border-left: 3px solid #2563eb;
+  border-bottom-left-radius: 6px;
+}
+.qr-corner-br {
+  bottom: 6px;
+  right: 6px;
+  border-bottom: 3px solid #2563eb;
+  border-right: 3px solid #2563eb;
+  border-bottom-right-radius: 6px;
+}
+
+/* Laser Scan Animation for QR Code */
+@keyframes laserScan {
+  0% {
+    top: 6px;
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    top: calc(100% - 10px);
+    opacity: 0.2;
+  }
+}
+
+.qr-scan-line {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #2563eb, #38bdf8, #2563eb, transparent);
+  box-shadow: 0 0 8px #38bdf8;
+  animation: laserScan 2s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+/* Amazon / Flipkart inspired badges */
+.badge-amazon {
+  background: linear-gradient(135deg, #232f3e 0%, #131921 100%);
+  color: #ff9900;
+}
+.badge-flipkart {
+  background: #2874f0;
+  color: #ffffff;
+}
+
+/* Checkout step styling */
+.checkout-step {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.checkout-step.active {
+  border-color: #2563eb;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -2px rgba(37, 99, 235, 0.1);
+}
+
+/* Toast animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+}
+
+.toast-enter {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast-exit {
+  animation: slideOutRight 0.25s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+/* Tab active indicator */
+.nav-tab-active {
+  position: relative;
+  color: #2563eb !important;
+  font-weight: 600;
+}
+.dark .nav-tab-active {
+  color: #60a5fa !important;
+}
+.nav-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #2563eb;
+  border-radius: 9999px;
+}
+.dark .nav-tab-active::after {
+  background-color: #60a5fa;
+}
+
+/* Receipt Print Media Queries */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-receipt-card, #printable-receipt-card * {
+    visibility: visible;
+  }
+  #printable-receipt-card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    box-shadow: none;
+    border: none;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Shimmer placeholder */
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmerAnim 1.5s infinite;
+}
+@keyframes shimmerAnim {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Custom Tooltips */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]:hover::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background-color: #1e293b;
+  color: #f8fafc;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
