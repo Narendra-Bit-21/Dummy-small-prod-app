@@ -1,5 +1,6 @@
 const paymentService = require('../services/payment.service');
 const notificationService = require('../services/notification.service');
+const db = require('../db/database');
 
 class PaymentController {
   /**
