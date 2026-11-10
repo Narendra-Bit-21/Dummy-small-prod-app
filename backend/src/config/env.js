@@ -6,7 +6,8 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const config = {
   port: parseInt(process.env.PORT, 10) || 5000,
-  nodeEnv: process.env.NODE_ENV || 'development',
+  // Default to production so deploys that forget NODE_ENV never leak stack traces
+  nodeEnv: process.env.NODE_ENV || 'production',
   corsOrigin: process.env.CORS_ORIGIN || '*',
   databasePath: process.env.DATABASE_PATH || path.resolve(__dirname, '../../../database/app.db'),
   autoNotifyOnPayment: process.env.AUTO_NOTIFY_ON_PAYMENT === 'true',
@@ -77,7 +78,10 @@ const config = {
     fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
     toOverride: process.env.RESEND_TO_OVERRIDE || '',
     isConfigured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_'))
-  }
+  },
+
+  // Admin token for recipient write routes (empty = auth disabled)
+  adminToken: process.env.ADMIN_TOKEN || ''
 };
 
 module.exports = config;

@@ -22,6 +22,16 @@ class PaymentService {
     this._initRazorpay();
   }
 
+  /**
+   * Timing-safe comparison of two hex signature strings
+   */
+  static _safeCompare(expected, received) {
+    const a = Buffer.from(String(expected ?? ''));
+    const b = Buffer.from(String(received ?? ''));
+    if (a.length === 0 || a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  }
+
   _initRazorpay() {
     if (Razorpay && config.razorpay.isConfigured) {
       try {
@@ -81,6 +91,10 @@ class PaymentService {
         };
       } catch (err) {
         console.error(`[PaymentService] Razorpay API Error: ${err.message}`);
+        // Never silently fall back to a simulated order in production
+        if (config.nodeEnv === 'production' && config.razorpay.isConfigured) {
+          throw err;
+        }
         // If API fails due to invalid test credentials, return friendly guidance
         return this._createSimulatedOrder({ amount, currency, receiptId, notes, errorHint: err.message });
       }
@@ -126,29 +140,33 @@ class PaymentService {
       throw new Error('razorpay_order_id and razorpay_payment_id are required for verification.');
     }
 
+    const isProduction = config.nodeEnv === 'production';
+    const existingPayment = await db.getPaymentByOrderId(razorpay_order_id);
     let isValid = false;
 
-    // If simulated order
+    // If simulated order: only honoured outside production, for a known, not-yet-paid order
     if (razorpay_order_id.startsWith('order_sim_')) {
-      isValid = true;
+      isValid = !isProduction && !!existingPayment && existingPayment.status !== 'paid';
     } else if (config.razorpay.keySecret) {
       const generatedSignature = crypto
         .createHmac('sha256', config.razorpay.keySecret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
         .digest('hex');
 
-      isValid = generatedSignature === razorpay_signature;
+      isValid = PaymentService._safeCompare(generatedSignature, razorpay_signature);
+    } else if (isProduction) {
+      // Refuse to verify anything in production without a secret
+      return {
+        verified: false,
+        message: 'Payment verification unavailable — server misconfigured.'
+      };
     } else {
       // In development fallback if no secret configured
       isValid = true;
     }
 
     if (!isValid) {
-      await db.updatePayment(razorpay_order_id, {
-        status: 'failed',
-        payment_id: razorpay_payment_id,
-        signature: razorpay_signature
-      });
+      // Do not touch the DB: a forged/junk signature must not be able to alter order state
       return {
         verified: false,
         message: 'Invalid payment signature. Verification failed.'
@@ -247,15 +265,19 @@ class PaymentService {
    * Handle Razorpay Webhook Events
    */
   async handleWebhook({ rawBody, signature, eventData }) {
-    if (config.razorpay.webhookSecret && signature) {
-      const expectedSignature = crypto
-        .createHmac('sha256', config.razorpay.webhookSecret)
-        .update(rawBody)
-        .digest('hex');
+    // Both a configured secret and a signature header are mandatory
+    if (!config.razorpay.webhookSecret || !signature) {
+      console.warn('[PaymentService] Webhook rejected: missing webhook secret or signature header.');
+      return { success: false, verified: false };
+    }
 
-      if (expectedSignature !== signature) {
-        throw new Error('Invalid webhook signature');
-      }
+    const expectedSignature = crypto
+      .createHmac('sha256', config.razorpay.webhookSecret)
+      .update(rawBody)
+      .digest('hex');
+
+    if (!PaymentService._safeCompare(expectedSignature, signature)) {
+      throw new Error('Invalid webhook signature');
     }
 
     const event = eventData.event;
@@ -272,6 +294,12 @@ class PaymentService {
     } else if (event === 'payment.failed') {
       const payment = eventData.payload?.payment?.entity;
       if (payment && payment.order_id) {
+        // Out-of-order events: never downgrade an already-paid order
+        const current = await db.getPaymentByOrderId(payment.order_id);
+        if (current && current.status === 'paid') {
+          console.log(`[PaymentService] Ignoring payment.failed for already-paid order ${payment.order_id}`);
+          return { received: true, event };
+        }
         await db.updatePayment(payment.order_id, {
           status: 'failed',
           payment_id: payment.id

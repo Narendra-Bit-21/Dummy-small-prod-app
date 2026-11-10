@@ -249,6 +249,12 @@ class PaymentManager {
               amount
             });
 
+            if (!verifyRes || verifyRes.success === false) {
+              window.app.showToast('error', 'Verification Failed', (verifyRes && verifyRes.message) || 'Unable to verify payment signature.');
+              window.app.refreshHistory();
+              return;
+            }
+
             this.showReceipt(verifyRes.transaction || {
               id: `txn_${Date.now()}`,
               order_id: response.razorpay_order_id,
@@ -331,12 +337,33 @@ class PaymentManager {
       let txn;
 
       if (window.apiService.isOnline) {
-        const res = await fetch(`${window.apiService.baseUrl}/payment/confirm-direct-upi`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ref_id: refId, amount })
-        });
-        if (res.ok) {
+        let res = null;
+        try {
+          res = await fetch(`${window.apiService.baseUrl}/payment/confirm-direct-upi`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ref_id: refId, amount })
+          });
+        } catch (netErr) {
+          // Network-level failure only (server unreachable) -> local fallback below
+          console.warn('[Payment] confirm-direct-upi unreachable, using local fallback', netErr);
+        }
+
+        // Server responded but rejected the confirmation (e.g. 400/404): no fake receipt
+        if (res && !res.ok) {
+          let serverData = {};
+          try { serverData = await res.json(); } catch { /* non-JSON error body */ }
+          const result = {
+            success: false,
+            status: 'failed',
+            message: serverData.message || serverData.error || 'UPI payment confirmation failed.'
+          };
+          window.app.showToast('error', 'Confirmation Failed', result.message);
+          window.app.playTone('error');
+          return result;
+        }
+
+        if (res && res.ok) {
           const data = await res.json();
           txn = {
             id: data.receiptId,
@@ -397,6 +424,11 @@ class PaymentManager {
       razorpay_signature: 'sig_mock_verified_' + Date.now(),
       amount
     });
+
+    if (!verifyRes || verifyRes.success === false || !verifyRes.transaction) {
+      window.app.showToast('error', 'Verification Failed', (verifyRes && verifyRes.message) || 'Payment verification failed.');
+      return;
+    }
 
     const txn = verifyRes.transaction;
     txn.method = methodName;

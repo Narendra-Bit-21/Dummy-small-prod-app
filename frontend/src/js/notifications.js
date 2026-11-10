@@ -4,6 +4,9 @@
  * template application, placeholder interpolation, and real-time status matrix.
  */
 
+// Local HTML-escape helper (this script loads before app.js)
+function escHtmlNotif(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
 class NotificationsManager {
   constructor() {
     this.recipients = [];
@@ -277,8 +280,8 @@ class NotificationsManager {
 
     this.previewBox.innerHTML = `
       <div class="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
-        <div><strong class="text-blue-600 dark:text-blue-400">Subject:</strong> ${renderedSubject || '<em class="text-slate-400">No subject provided</em>'}</div>
-        <div class="pt-1 border-t border-slate-200 dark:border-slate-800 whitespace-pre-wrap font-sans text-slate-800 dark:text-slate-200 leading-relaxed">${renderedBody || '<em class="text-slate-400">Start typing in the composer to view live preview...</em>'}</div>
+        <div><strong class="text-blue-600 dark:text-blue-400">Subject:</strong> ${renderedSubject ? escHtmlNotif(renderedSubject) : '<em class="text-slate-400">No subject provided</em>'}</div>
+        <div class="pt-1 border-t border-slate-200 dark:border-slate-800 whitespace-pre-wrap font-sans text-slate-800 dark:text-slate-200 leading-relaxed">${renderedBody ? escHtmlNotif(renderedBody) :'<em class="text-slate-400">Start typing in the composer to view live preview...</em>'}</div>
       </div>
     `;
   }
@@ -488,7 +491,7 @@ class NotificationsManager {
         } else if (status === 'simulated') {
           badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-medium" title="Simulated — credentials not configured"><i data-lucide="eye" class="w-3 h-3 mr-1"></i> Simulated</span>`;
         } else {
-          badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-medium" title="${item.error || item.detail || ''}"><i data-lucide="x-circle" class="w-3 h-3 mr-1"></i> Failed</span>`;
+          badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-medium" title="${escHtmlNotif(item.error || item.detail || '')}"><i data-lucide="x-circle" class="w-3 h-3 mr-1"></i> Failed</span>`;
         }
       }
 
@@ -516,7 +519,7 @@ class NotificationsManager {
     } else if (status === 'simulated') {
       badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-medium" title="Simulated — credentials not configured"><i data-lucide="eye" class="w-3 h-3 mr-1"></i> Simulated</span>`;
     } else {
-      badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-medium" title="${item.error || item.detail || ''}"><i data-lucide="x-circle" class="w-3 h-3 mr-1"></i> Failed</span>`;
+      badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-medium" title="${escHtmlNotif(item.error || item.detail || '')}"><i data-lucide="x-circle" class="w-3 h-3 mr-1"></i> Failed</span>`;
     }
     lucide.createIcons();
   }

@@ -9,7 +9,8 @@ class NotificationController {
     try {
       const {
         batch_id,
-        recipients, // optional array override
+        // NOTE: req.body.recipients is intentionally ignored — recipients are
+        // always loaded from the DB to prevent use as an open messaging relay.
         channels = ['email', 'whatsapp', 'sms'],
         subject = 'Notification Alert',
         message,
@@ -25,7 +26,6 @@ class NotificationController {
       }
 
       const dispatchSummary = await notificationService.sendToRecipients({
-        recipients,
         channels,
         subject,
         message,
@@ -53,7 +53,8 @@ class NotificationController {
    */
   async streamNotifications(req, res, next) {
     try {
-      const { recipients, channels, subject = 'Notification Alert', message, metadata = {}, amount = null } = req.body;
+      // req.body.recipients is intentionally ignored (open-relay prevention); DB recipients are used.
+      const { channels, subject = 'Notification Alert', message, metadata = {}, amount = null } = req.body;
 
       if (!message || message.trim() === '') {
         return res.status(400).json({ success: false, message: 'The `message` parameter is required.' });
@@ -65,7 +66,7 @@ class NotificationController {
       res.flushHeaders();
 
       const dispatchSummary = await notificationService.sendToRecipients({
-        recipients, channels, subject, message, metadata, amount,
+        channels, subject, message, metadata, amount,
         onResult: (item) => {
           if (!res.writableEnded) res.write(`data: ${JSON.stringify({ type: 'result', ...item })}\n\n`);
         }

@@ -2,6 +2,20 @@ const paymentService = require('../services/payment.service');
 const notificationService = require('../services/notification.service');
 const db = require('../db/database');
 const config = require('../config/env');
+const crypto = require('crypto');
+
+const MAX_AMOUNT_RUPEES = 100000;
+
+function parseNotes(notes) {
+  if (!notes) return {};
+  if (typeof notes === 'object') return notes;
+  try {
+    const parsed = JSON.parse(notes);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
 
 class PaymentController {
   /**
@@ -30,14 +44,23 @@ class PaymentController {
     try {
       let { amount = 1.00, currency = 'INR', receipt, notes } = req.body;
 
-      let numAmount = Number(amount) || 1.00;
-      // If amount is passed in paise (e.g. 100 for ₹1)
-      if (numAmount >= 100 && Number.isInteger(numAmount)) {
-        numAmount = numAmount / 100;
+      // Amount is always supplied in paise by the frontend (₹1 = 100 paise)
+      const numAmount = Number(amount);
+      if (
+        !Number.isFinite(numAmount) ||
+        !Number.isInteger(numAmount) ||
+        numAmount < 100 ||
+        numAmount > MAX_AMOUNT_RUPEES * 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `amount must be an integer in paise between 100 (₹1) and ${MAX_AMOUNT_RUPEES * 100} (₹${MAX_AMOUNT_RUPEES}).`
+        });
       }
+      const amountInRupees = numAmount / 100;
 
       const orderData = await paymentService.createRazorpayOrder({
-        amount: numAmount,
+        amount: amountInRupees,
         currency,
         receipt,
         notes
@@ -79,6 +102,19 @@ class PaymentController {
         });
       }
 
+      // Idempotency: if the order is already paid, return existing data without re-dispatching
+      const existingOrder = await db.getPaymentByOrderId(razorpay_order_id);
+      if (existingOrder && existingOrder.status === 'paid') {
+        return res.status(200).json({
+          success: true,
+          message: 'Payment already verified.',
+          alreadyPaid: true,
+          transaction: existingOrder,
+          data: { verified: true, orderId: razorpay_order_id, payment: existingOrder },
+          notificationsDispatched: null
+        });
+      }
+
       const verificationResult = await paymentService.verifyPaymentSignature({
         razorpay_order_id,
         razorpay_payment_id,
@@ -95,7 +131,12 @@ class PaymentController {
       // Optionally dispatch notifications to the 2 recipients upon payment confirmation
       let dispatchSummary = null;
       if (notifyRecipients) {
-        const paidAmount = amount ? parseFloat(amount) : null;
+        // Receipt amount comes from the DB order (rupees); fall back to client paise value only if missing
+        const dbAmount = existingOrder && existingOrder.amount ? parseFloat(existingOrder.amount) : 0;
+        const fallbackAmount = amount ? parseFloat(amount) / 100 : 0;
+        const paidAmount = dbAmount > 0
+          ? dbAmount
+          : (Number.isFinite(fallbackAmount) && fallbackAmount > 0 ? fallbackAmount : null);
         const amtStr = paidAmount ? `₹${paidAmount.toFixed(2)}` : '₹(amount)';
         try {
           dispatchSummary = await notificationService.sendToRecipients({
@@ -135,20 +176,27 @@ class PaymentController {
     try {
       const {
         amount = 1.00,
-        payeeVpa,
-        payeeName,
         note,
-        transactionNote = 'Dummy App Order ₹1',
-        ref_id,
-        orderId
+        transactionNote = 'Dummy App Order ₹1'
       } = req.body;
 
+      const numAmount = Number(amount);
+      if (!Number.isFinite(numAmount) || numAmount <= 0 || numAmount > MAX_AMOUNT_RUPEES) {
+        return res.status(400).json({ success: false, message: 'Invalid amount.' });
+      }
+
+      // Payee details always come from server config; never trust client-supplied values
+      const payeeVpa = config.upi.vpa;
+      const payeeName = config.upi.payeeName;
+      // Reference ID is generated server-side; client-supplied ref_id/orderId are ignored
+      const ref_id = `UPI_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
       const upiResult = await paymentService.generateUpiQr({
-        amount: Number(amount) || 1.00,
+        amount: numAmount,
         payeeVpa,
         payeeName,
         transactionNote: note || transactionNote,
-        orderId: ref_id || orderId
+        orderId: ref_id
       });
 
       return res.status(200).json({
@@ -185,19 +233,61 @@ class PaymentController {
         });
       }
 
-      const receiptId = `RCPT_UPI_${Date.now().toString().slice(-6)}`;
+      const existingOrder = await db.getPaymentByOrderId(targetId);
+      if (!existingOrder) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found.'
+        });
+      }
+
+      if (existingOrder.method && existingOrder.method !== 'upi_direct') {
+        return res.status(400).json({
+          success: false,
+          message: 'This order cannot be confirmed via UPI direct.'
+        });
+      }
+
+      if (existingOrder.status === 'paid') {
+        return res.status(200).json({
+          success: true,
+          message: 'Direct UPI payment already confirmed.',
+          alreadyPaid: true,
+          paymentId: existingOrder.payment_id,
+          transaction: existingOrder,
+          notificationsDispatched: null
+        });
+      }
+
+      if (existingOrder.status === 'failed') {
+        return res.status(400).json({
+          success: false,
+          message: 'Order already failed'
+        });
+      }
+
+      const receiptId = `RCPT_UPI_${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
       const paymentId = utr_number ? `UPI_UTR_${utr_number}` : `UPI_VERIFIED_${Date.now().toString().slice(-6)}`;
 
       const updated = await db.updatePayment(targetId, {
         status: 'paid',
         payment_id: paymentId,
-        notes: { utr: utr_number || 'direct_upi_confirmed', verifiedAt: new Date().toISOString() }
+        notes: {
+          ...parseNotes(existingOrder.notes),
+          utr: utr_number || 'direct_upi_confirmed',
+          verifiedAt: new Date().toISOString()
+        }
       });
+
+      // Receipt amount comes from the DB record; fall back to client value only if DB has none
+      const orderAmount = existingOrder.amount != null && existingOrder.amount !== ''
+        ? existingOrder.amount
+        : amount;
 
       let dispatchSummary = null;
       if (notifyRecipients) {
         try {
-          const amtNum = amount ? parseFloat(amount) : null;
+          const amtNum = orderAmount ? parseFloat(orderAmount) : null;
           const amtStr = amtNum ? `₹${amtNum.toFixed(2)}` : '₹(amount)';
           dispatchSummary = await notificationService.sendToRecipients({
             subject: `Official Receipt: ${amtStr} Payment Confirmed via UPI`,
@@ -264,13 +354,18 @@ class PaymentController {
         eventData: req.body
       });
 
+      // Unverified webhook: do not process or dispatch anything
+      if (result && result.verified === false) {
+        return res.status(401).json(result);
+      }
+
       // Automatically dispatch receipt on asynchronous webhook capture
       if (req.body?.event === 'payment.captured') {
         const payment = req.body?.payload?.payment?.entity;
         if (payment) {
           try {
             await notificationService.sendToRecipients({
-              subject: 'Payment Confirmation: ₹1.00 Received (Auto-Captured)',
+              subject: `Payment Confirmation: ₹${(payment.amount / 100).toFixed(2)} Received (Auto-Captured)`,
               message: `Payment of ₹${(payment.amount / 100).toFixed(2)} was received and verified.\nPayment ID: ${payment.id}\nOrder ID: ${payment.order_id || 'N/A'}\nMethod: ${payment.method || 'UPI/Card'}`,
               metadata: {
                 Payment_ID: payment.id,

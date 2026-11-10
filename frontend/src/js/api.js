@@ -126,13 +126,31 @@ class ApiService {
    */
   async verifyPayment(verificationData) {
     if (this.isOnline) {
+      let res;
       try {
-        const res = await fetch(`${this.baseUrl}/payment/verify`, {
+        res = await fetch(`${this.baseUrl}/payment/verify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(verificationData)
         });
-        if (res.ok) {
+      } catch (err) {
+        // Network-level failure only (server unreachable) -> fall through to local verification
+        console.warn('[API] Verification API unreachable, handling locally', err);
+      }
+
+      // Server responded but explicitly rejected the payment: report failure, never fake success
+      if (res && !res.ok) {
+        let serverData = {};
+        try { serverData = await res.json(); } catch { /* non-JSON error body */ }
+        return {
+          success: false,
+          status: 'failed',
+          message: serverData.message || serverData.error || 'Payment verification failed.'
+        };
+      }
+
+      if (res && res.ok) {
+        try {
           const result = await res.json();
           this.logPaymentRecord({
             order_id: verificationData.razorpay_order_id,
@@ -143,9 +161,14 @@ class ApiService {
             created_at: new Date().toISOString()
           });
           return result;
+        } catch (err) {
+          console.warn('[API] Could not parse verification response', err);
+          return {
+            success: false,
+            status: 'failed',
+            message: 'Invalid response from payment server.'
+          };
         }
-      } catch (err) {
-        console.warn('[API] Verification API failed, handling locally', err);
       }
     }
 
@@ -298,9 +321,10 @@ class ApiService {
 
     if (this.isOnline) {
       try {
+        const adminToken = localStorage.getItem('qp_admin_token') || '';
         const res = await fetch(`${this.baseUrl}/recipients`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(adminToken && { 'x-admin-token': adminToken }) },
           body: JSON.stringify({ recipients: recipientsList })
         });
         if (res.ok) {

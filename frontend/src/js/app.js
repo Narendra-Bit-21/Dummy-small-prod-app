@@ -4,6 +4,30 @@
  * history tables, and environment state.
  */
 
+function escHtml(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function paymentStatusBadge(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'paid' || s === 'success' || s === 'captured') {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                <i data-lucide="check" class="w-3 h-3 mr-1"></i> ${s === 'success' ? 'Success' : 'Paid'}
+              </span>`;
+  }
+  if (s === 'pending' || s === 'created') {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                <i data-lucide="clock" class="w-3 h-3 mr-1"></i> ${s === 'created' ? 'Created' : 'Pending'}
+              </span>`;
+  }
+  if (s === 'failed') {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300">
+                <i data-lucide="x" class="w-3 h-3 mr-1"></i> Failed
+              </span>`;
+  }
+  return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                ${escHtml(status || 'Unknown')}
+              </span>`;
+}
+
 class AppController {
   constructor() {
     this.currentTab = 'checkout';
@@ -278,32 +302,40 @@ class AppController {
         paymentsTbody.innerHTML = filteredPayments.map(p => `
           <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 transition">
             <td class="px-6 py-4 font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">
-              ${p.receipt_id || p.id}
+              ${escHtml(p.receipt_id || p.id)}
             </td>
             <td class="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">
-              ${new Date(p.created_at).toLocaleString()}
+              ${escHtml(new Date(p.created_at).toLocaleString())}
             </td>
             <td class="px-6 py-4 text-xs font-medium text-slate-700 dark:text-slate-300">
               <span class="inline-flex items-center">
                 <i data-lucide="credit-card" class="w-3.5 h-3.5 mr-1.5 text-blue-500"></i>
-                ${p.method || 'Standard'}
+                ${escHtml(p.method || 'Standard')}
               </span>
             </td>
             <td class="px-6 py-4 text-xs font-bold text-slate-900 dark:text-white">
-              ₹${(p.amount || 1).toFixed(2)}
+              ₹${(Number(p.amount) || 1).toFixed(2)}
             </td>
             <td class="px-6 py-4 text-xs">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
-                <i data-lucide="check" class="w-3 h-3 mr-1"></i> Success
-              </span>
+              ${paymentStatusBadge(p.status)}
             </td>
             <td class="px-6 py-4 text-xs text-right">
-              <button onclick="window.paymentManager.showReceiptById('${p.id}')" class="px-2.5 py-1 text-xs rounded bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium transition cursor-pointer">
+              <button data-receipt-id="${escHtml(p.id)}" class="btn-view-receipt px-2.5 py-1 text-xs rounded bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium transition cursor-pointer">
                 View Receipt
               </button>
             </td>
           </tr>
         `).join('');
+      }
+      // Delegated click handler (avoids injecting server data into inline JS)
+      if (!paymentsTbody.dataset.receiptHandlerBound) {
+        paymentsTbody.addEventListener('click', (e) => {
+          const btn = e.target.closest('.btn-view-receipt');
+          if (btn && window.paymentManager) {
+            window.paymentManager.showReceiptById(btn.dataset.receiptId);
+          }
+        });
+        paymentsTbody.dataset.receiptHandlerBound = '1';
       }
     }
 
@@ -333,11 +365,11 @@ class AppController {
         notifsTbody.innerHTML = filteredNotifs.map(n => `
           <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 transition">
             <td class="px-6 py-4 font-mono text-xs text-slate-500 dark:text-slate-400">
-              ${new Date(n.timestamp).toLocaleTimeString()}
+              ${escHtml(new Date(n.timestamp).toLocaleTimeString())}
             </td>
             <td class="px-6 py-4 text-xs font-semibold text-slate-800 dark:text-slate-200">
-              <div>${n.recipient_name}</div>
-              <div class="text-[11px] font-normal text-slate-400 font-mono">${n.recipient_target}</div>
+              <div>${escHtml(n.recipient_name)}</div>
+              <div class="text-[11px] font-normal text-slate-400 font-mono">${escHtml(n.recipient_target)}</div>
             </td>
             <td class="px-6 py-4 text-xs font-medium">
               <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] uppercase font-semibold ${
@@ -345,11 +377,11 @@ class AppController {
                 n.channel === 'whatsapp' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' :
                 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
               }">
-                ${n.channel}
+                ${escHtml(n.channel)}
               </span>
             </td>
-            <td class="px-6 py-4 text-xs text-slate-600 dark:text-slate-300 max-w-xs truncate" title="${n.subject || ''}">
-              ${n.subject || 'Multi-channel broadcast'}
+            <td class="px-6 py-4 text-xs text-slate-600 dark:text-slate-300 max-w-xs truncate" title="${escHtml(n.subject || '')}">
+              ${escHtml(n.subject || 'Multi-channel broadcast')}
             </td>
             <td class="px-6 py-4 text-xs">
               ${(n.status === 'sent' || n.status === 'success')
@@ -360,13 +392,13 @@ class AppController {
                 ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300" title="Simulated — credentials not configured">
                      <i data-lucide="eye" class="w-3 h-3 mr-1"></i> Simulated
                    </span>`
-                : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300" title="${n.detail || n.error || ''}">
+                : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300" title="${escHtml(n.detail || n.error || '')}">
                      <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> Failed
                    </span>`
               }
             </td>
-            <td class="px-6 py-4 text-xs text-slate-500 dark:text-slate-400 max-w-xs truncate" title="${n.detail || ''}">
-              ${n.detail || 'Dispatched via gateway'}
+            <td class="px-6 py-4 text-xs text-slate-500 dark:text-slate-400 max-w-xs truncate" title="${escHtml(n.detail || '')}">
+              ${escHtml(n.detail || 'Dispatched via gateway')}
             </td>
           </tr>
         `).join('');
@@ -448,8 +480,8 @@ class AppController {
         <i data-lucide="${iconName}" class="w-5 h-5"></i>
       </div>
       <div class="flex-1 mr-2">
-        <h4 class="font-semibold text-sm leading-tight">${title}</h4>
-        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">${message}</p>
+        <h4 class="font-semibold text-sm leading-tight">${escHtml(title)}</h4>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">${escHtml(message)}</p>
       </div>
       <button class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 -mr-1 -mt-1 transition">
         <i data-lucide="x" class="w-4 h-4"></i>

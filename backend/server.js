@@ -20,10 +20,16 @@ app.use(
 );
 
 // Cross-Origin Resource Sharing
+// Never reflect arbitrary origins with credentials. '*' => cross-origin disabled
+// (frontend is served same-origin); otherwise allow only the explicit list.
+const corsWildcard = config.corsOrigin === '*';
+const corsAllowList = corsWildcard
+  ? false
+  : config.corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
 app.use(
   cors({
-    origin: config.corsOrigin === '*' ? true : config.corsOrigin,
-    credentials: true,
+    origin: corsAllowList,
+    credentials: !corsWildcard,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-razorpay-signature']
   })
@@ -125,6 +131,7 @@ async function startServer() {
       console.log('\n[Server] Gracefully shutting down...');
       server.close(() => {
         console.log('[Server] Closed remaining HTTP connections.');
+        try { if (db.sqliteDb) db.sqliteDb.close(); } catch {}
         process.exit(0);
       });
     };
@@ -139,6 +146,8 @@ async function startServer() {
 
 // Only auto-start when executed directly (allows importing in tests)
 if (require.main === module) {
+  process.on('unhandledRejection', (reason) => console.error('[Process] Unhandled rejection:', reason));
+  process.on('uncaughtException', (err) => { console.error('[Process] Uncaught exception:', err); process.exit(1); });
   startServer();
 }
 

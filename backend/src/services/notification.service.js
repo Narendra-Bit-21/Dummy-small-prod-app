@@ -16,6 +16,11 @@ try {
   Resend = null;
 }
 
+// Escape a value for safe interpolation into the HTML email body.
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 class NotificationService {
   constructor() {
     this.emailTransporter = null;
@@ -65,8 +70,8 @@ class NotificationService {
               .map(
                 ([k, v]) => `
               <tr>
-                <td style="padding: 4px 0; font-weight: 600; text-transform: capitalize; width: 40%;">${k.replace(/_/g, ' ')}:</td>
-                <td style="padding: 4px 0; color: #0f172a; font-family: monospace;">${String(v)}</td>
+                <td style="padding: 4px 0; font-weight: 600; text-transform: capitalize; width: 40%;">${escHtml(k.replace(/_/g, ' '))}:</td>
+                <td style="padding: 4px 0; color: #0f172a; font-family: monospace;">${escHtml(v)}</td>
               </tr>
             `
               )
@@ -82,14 +87,14 @@ class NotificationService {
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${subject}</title>
+        <title>${escHtml(subject)}</title>
       </head>
       <body style="margin: 0; padding: 24px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
         <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0;">
           <!-- Header Banner -->
           <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 28px 24px; text-align: center;">
             <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">
-              ${config.gmail.fromName}
+              ${escHtml(config.gmail.fromName)}
             </h1>
             <p style="margin: 6px 0 0 0; color: #e0e7ff; font-size: 13px;">Official Notification & Alert Dispatch</p>
           </div>
@@ -97,17 +102,17 @@ class NotificationService {
           <!-- Body Content -->
           <div style="padding: 28px 24px;">
             <p style="font-size: 16px; color: #1e293b; margin-top: 0;">
-              Hello <strong>${recipientName || 'Valued User'}</strong>,
+              Hello <strong>${escHtml(recipientName || 'Valued User')}</strong>,
             </p>
 
             <div style="font-size: 15px; line-height: 1.6; color: #334155; margin: 16px 0; padding: 16px; background-color: #f8fafc; border-left: 4px solid #4f46e5; border-radius: 4px;">
-              ${message.replace(/\n/g, '<br/>')}
+              ${escHtml(message).replace(/\n/g, '<br/>')}
             </div>
 
             ${metaHtml}
 
             <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
-              Timestamp: <strong>${timestamp} IST</strong>
+              Timestamp: <strong>${escHtml(timestamp)} IST</strong>
             </p>
           </div>
 
@@ -154,8 +159,11 @@ class NotificationService {
 
         console.log(`[NotificationService] Email dispatched via Resend to ${toAddress} (id: ${data.id})`);
         return { success: true, status: 'sent', channel: 'email', target: toAddress, externalId: data.id };
-      } catch (err) {
-        console.error(`[NotificationService] Resend exception: ${err.message}`);
+      } catch (resendErr) {
+        // Resend is configured but threw: report the real failure instead of
+        // falling through to Gmail / simulated (which would mask it as success).
+        console.error(`[NotificationService] Resend exception: ${resendErr.message}`);
+        return { success: false, status: 'failed', channel: 'email', target: to, error: `Resend Error: ${resendErr.message}` };
       }
     }
 
@@ -275,6 +283,7 @@ class NotificationService {
     const indianPhone = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
 
     // 1. Try Fast2SMS if configured (common for Indian mobile numbers)
+    let fast2smsError = null;
     if (config.fast2sms.isConfigured) {
       try {
         const response = await axios.post(
@@ -303,9 +312,24 @@ class NotificationService {
             externalId: response.data.request_id
           };
         }
+        fast2smsError = new Error(`Fast2SMS rejected request: ${response.data?.message || 'unknown error'}`);
       } catch (fErr) {
-        console.warn(`[NotificationService] Fast2SMS error: ${fErr.message}`);
+        const fMsg = fErr.response?.data?.message || fErr.message;
+        console.warn(`[NotificationService] Fast2SMS error: ${fMsg}`);
+        fast2smsError = new Error(fMsg);
       }
+    }
+
+    // Fast2SMS was configured but failed, and there is no Twilio fallback:
+    // report a real failure instead of masking it as a simulated success.
+    if (fast2smsError && !(config.twilio.isConfigured && config.twilio.phoneNumber)) {
+      return {
+        success: false,
+        status: 'failed',
+        channel: 'sms',
+        target: indianPhone,
+        error: `Fast2SMS Error: ${fast2smsError.message}`
+      };
     }
 
     // 2. Try Twilio SMS if configured
