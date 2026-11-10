@@ -67,18 +67,25 @@ class NotificationController {
       const dispatchSummary = await notificationService.sendToRecipients({
         recipients, channels, subject, message, metadata, amount,
         onResult: (item) => {
-          res.write(`data: ${JSON.stringify({ type: 'result', ...item })}\n\n`);
+          if (!res.writableEnded) res.write(`data: ${JSON.stringify({ type: 'result', ...item })}\n\n`);
         }
       });
 
-      res.write(`data: ${JSON.stringify({ type: 'done', summary: dispatchSummary })}\n\n`);
-      res.end();
-    } catch (err) {
-      try {
-        res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ type: 'done', summary: dispatchSummary })}\n\n`);
         res.end();
+      }
+    } catch (err) {
+      // Failure before the SSE stream opened: normal error handler is still safe.
+      if (!res.headersSent) return next(err);
+      // SSE headers are already sent — don't call next(err) (would cause ERR_HTTP_HEADERS_SENT).
+      console.error(`[NotificationController] SSE dispatch error: ${err.message}`);
+      try {
+        if (!res.writableEnded) {
+          res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+          res.end();
+        }
       } catch {}
-      next(err);
     }
   }
 

@@ -206,6 +206,7 @@ class NotificationService {
    * Send WhatsApp Message via Twilio or Fallback Intent
    */
   async sendWhatsApp({ phone, recipientName, message }) {
+    phone = String(phone ?? '');
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
     const waPhone = cleanPhone.startsWith('+') ? cleanPhone : `+91${cleanPhone.replace(/^0+/, '')}`;
     const directUrl = `https://wa.me/${waPhone.replace('+', '')}?text=${encodeURIComponent(message)}`;
@@ -269,6 +270,7 @@ class NotificationService {
    * Send SMS via Twilio or Fast2SMS with clean fallback
    */
   async sendSMS({ phone, recipientName, message }) {
+    phone = String(phone ?? '');
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const indianPhone = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
 
@@ -406,24 +408,41 @@ class NotificationService {
       }
     }
 
-    // Fire all sends in parallel
-    const results = await Promise.all(sendTasks.map(async ({ recipient, channel, target, fn }) => {
-      const result = await fn();
-      await db.logNotification({
-        recipient_id: recipient.id,
-        recipient_name: recipient.name,
-        recipient_target: target,
-        channel,
-        subject,
-        message,
-        status: result.status,
-        error: result.error || null,
-        external_id: result.externalId || null
-      });
-      const item = { recipientId: recipient.id, recipientName: recipient.name, channel, ...result };
-      if (onResult) onResult(item);
+    // Fire all sends in parallel. Each task catches its own errors so it always
+    // resolves to a result object — one failing send must never abort the batch.
+    const settled = await Promise.allSettled(sendTasks.map(async ({ recipient, channel, target, fn }) => {
+      let item;
+      try {
+        const result = await fn();
+        await db.logNotification({
+          recipient_id: recipient.id,
+          recipient_name: recipient.name,
+          recipient_target: target,
+          channel,
+          subject,
+          message,
+          status: result.status,
+          error: result.error || null,
+          external_id: result.externalId || null
+        });
+        item = { recipientId: recipient.id, recipientName: recipient.name, channel, ...result };
+      } catch (err) {
+        console.error(`[NotificationService] ${channel} task failed for ${recipient.name}: ${err.message}`);
+        item = { recipientId: recipient.id, recipientName: recipient.name, channel, status: 'failed', error: err.message };
+      }
+      if (onResult) {
+        try {
+          onResult(item);
+        } catch (cbErr) {
+          console.error(`[NotificationService] onResult callback error: ${cbErr.message}`);
+        }
+      }
       return item;
     }));
+
+    const results = settled.map((s) => (s.status === 'fulfilled'
+      ? s.value
+      : { status: 'failed', error: s.reason?.message || String(s.reason) }));
 
     const sentCount = results.filter((r) => r.status === 'sent').length;
     const simulatedCount = results.filter((r) => r.status === 'simulated').length;
