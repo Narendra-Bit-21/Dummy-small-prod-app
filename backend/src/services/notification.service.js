@@ -115,6 +115,11 @@ class NotificationService {
    * Send Email to a specific recipient
    */
   async sendEmail({ to, recipientName, subject, message, metadata = {} }) {
+    if (!to || !to.includes('@')) {
+      console.warn(`[NotificationService] Skipping email to ${recipientName}: invalid or empty address "${to}"`);
+      return { success: false, status: 'failed', channel: 'email', target: to || '', error: 'Invalid or empty email address' };
+    }
+
     const html = this._buildEmailHtml({ recipientName, subject, message, metadata });
 
     if (this.emailTransporter && config.gmail.isConfigured) {
