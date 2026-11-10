@@ -388,9 +388,17 @@ class NotificationsManager {
       const dispatchResponse = await window.apiService.dispatchNotifications(payload);
 
       // Animate each recipient and channel result in the status matrix
-      await this.animateDispatchResults(dispatchResponse.results || []);
+      const results = dispatchResponse.results || [];
+      await this.animateDispatchResults(results);
 
-      window.app.showToast('success', 'Broadcast Dispatched!', `Notifications sent to both recipients across active channels.`);
+      const sentCount = results.filter(r => r.status === 'sent' || r.status === 'success').length;
+      const simCount = results.filter(r => r.status === 'simulated').length;
+      const failCount = results.filter(r => r.status === 'failed').length;
+      const summary = [`${sentCount} sent`];
+      if (simCount) summary.push(`${simCount} simulated`);
+      if (failCount) summary.push(`${failCount} failed`);
+      const toastType = failCount === results.length ? 'error' : sentCount > 0 ? 'success' : 'warning';
+      window.app.showToast(toastType, 'Broadcast Complete', summary.join(', ') + '.');
       window.app.playTone('success');
       window.app.refreshHistory();
     } catch (err) {
@@ -447,10 +455,13 @@ class NotificationsManager {
       }
 
       if (badgeEl) {
-        if (['sent', 'simulated', 'success'].includes(item.status)) {
+        const status = item.status;
+        if (status === 'sent' || status === 'success') {
           badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-medium"><i data-lucide="check-circle-2" class="w-3 h-3 mr-1"></i> Sent</span>`;
+        } else if (status === 'simulated') {
+          badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-medium" title="Simulated — credentials not configured"><i data-lucide="eye" class="w-3 h-3 mr-1"></i> Simulated</span>`;
         } else {
-          badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-medium" title="${item.detail}"><i data-lucide="x-circle" class="w-3 h-3 mr-1"></i> Failed</span>`;
+          badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-medium" title="${item.error || item.detail || ''}"><i data-lucide="x-circle" class="w-3 h-3 mr-1"></i> Failed</span>`;
         }
       }
 
