@@ -30,6 +30,9 @@ class NotificationService {
           port: 587,
           secure: false,
           requireTLS: true,
+          connectionTimeout: 5000,
+          greetingTimeout: 5000,
+          socketTimeout: 5000,
           auth: {
             user: config.gmail.user,
             pass: config.gmail.appPassword.replace(/\s+/g, '')
@@ -358,7 +361,7 @@ class NotificationService {
   /**
    * Batch Sender: Dispatches to the 2 recipients across all selected channels
    */
-  async sendToRecipients({ recipients = null, channels = ['email', 'whatsapp', 'sms'], subject = 'Important Alert', message, metadata = {}, amount = null }) {
+  async sendToRecipients({ recipients = null, channels = ['email', 'whatsapp', 'sms'], subject = 'Important Alert', message, metadata = {}, amount = null, onResult = null }) {
     if (!message || message.trim() === '') {
       throw new Error('Message content is required for dispatch.');
     }
@@ -373,8 +376,9 @@ class NotificationService {
     }
 
     const channelList = Array.isArray(channels) && channels.length > 0 ? channels : ['email', 'whatsapp', 'sms'];
-    const results = [];
 
+    // Build all send tasks across recipients × channels
+    const sendTasks = [];
     for (const recipient of targetRecipients) {
       const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
       const amountStr = amount ? `₹${parseFloat(amount).toFixed(2)}` : '₹1.00';
@@ -387,89 +391,39 @@ class NotificationService {
         .replace(/\{name\}/gi, recipient.name || 'Valued User')
         .replace(/\{amount\}/gi, amountStr);
 
-      // 1. Email Channel
       if (channelList.includes('email') && recipient.email) {
-        const emailResult = await this.sendEmail({
-          to: recipient.email,
-          recipientName: recipient.name,
-          subject: interpolatedSubject,
-          message: interpolatedMessage,
-          metadata
-        });
-
-        await db.logNotification({
-          recipient_id: recipient.id,
-          recipient_name: recipient.name,
-          recipient_target: recipient.email,
-          channel: 'email',
-          subject,
-          message,
-          status: emailResult.status,
-          error: emailResult.error || null,
-          external_id: emailResult.externalId || null
-        });
-
-        results.push({
-          recipientId: recipient.id,
-          recipientName: recipient.name,
-          ...emailResult
-        });
+        sendTasks.push({ recipient, channel: 'email', target: recipient.email,
+          fn: () => this.sendEmail({ to: recipient.email, recipientName: recipient.name, subject: interpolatedSubject, message: interpolatedMessage, metadata }) });
       }
-
-      // 2. WhatsApp Channel
       if (channelList.includes('whatsapp') && (recipient.whatsapp || recipient.phone)) {
-        const waResult = await this.sendWhatsApp({
-          phone: recipient.whatsapp || recipient.phone,
-          recipientName: recipient.name,
-          message: interpolatedMessage
-        });
-
-        await db.logNotification({
-          recipient_id: recipient.id,
-          recipient_name: recipient.name,
-          recipient_target: recipient.whatsapp || recipient.phone,
-          channel: 'whatsapp',
-          subject,
-          message,
-          status: waResult.status,
-          error: waResult.error || null,
-          external_id: waResult.externalId || null
-        });
-
-        results.push({
-          recipientId: recipient.id,
-          recipientName: recipient.name,
-          ...waResult
-        });
+        const waPhone = recipient.whatsapp || recipient.phone;
+        sendTasks.push({ recipient, channel: 'whatsapp', target: waPhone,
+          fn: () => this.sendWhatsApp({ phone: waPhone, recipientName: recipient.name, message: interpolatedMessage }) });
       }
-
-      // 3. SMS Channel
       if (channelList.includes('sms') && recipient.phone) {
-        const smsResult = await this.sendSMS({
-          phone: recipient.phone,
-          recipientName: recipient.name,
-          message: interpolatedMessage
-        });
-
-        await db.logNotification({
-          recipient_id: recipient.id,
-          recipient_name: recipient.name,
-          recipient_target: recipient.phone,
-          channel: 'sms',
-          subject,
-          message,
-          status: smsResult.status,
-          error: smsResult.error || null,
-          external_id: smsResult.externalId || null
-        });
-
-        results.push({
-          recipientId: recipient.id,
-          recipientName: recipient.name,
-          ...smsResult
-        });
+        sendTasks.push({ recipient, channel: 'sms', target: recipient.phone,
+          fn: () => this.sendSMS({ phone: recipient.phone, recipientName: recipient.name, message: interpolatedMessage }) });
       }
     }
+
+    // Fire all sends in parallel
+    const results = await Promise.all(sendTasks.map(async ({ recipient, channel, target, fn }) => {
+      const result = await fn();
+      await db.logNotification({
+        recipient_id: recipient.id,
+        recipient_name: recipient.name,
+        recipient_target: target,
+        channel,
+        subject,
+        message,
+        status: result.status,
+        error: result.error || null,
+        external_id: result.externalId || null
+      });
+      const item = { recipientId: recipient.id, recipientName: recipient.name, channel, ...result };
+      if (onResult) onResult(item);
+      return item;
+    }));
 
     const sentCount = results.filter((r) => r.status === 'sent').length;
     const simulatedCount = results.filter((r) => r.status === 'simulated').length;

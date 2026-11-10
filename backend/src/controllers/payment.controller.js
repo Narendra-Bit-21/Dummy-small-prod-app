@@ -1,6 +1,7 @@
 const paymentService = require('../services/payment.service');
 const notificationService = require('../services/notification.service');
 const db = require('../db/database');
+const config = require('../config/env');
 
 class PaymentController {
   /**
@@ -68,7 +69,7 @@ class PaymentController {
         razorpay_payment_id,
         razorpay_signature,
         amount,
-        notifyRecipients = false
+        notifyRecipients = config.autoNotifyOnPayment
       } = req.body;
 
       if (!razorpay_order_id || !razorpay_payment_id) {
@@ -174,7 +175,7 @@ class PaymentController {
    */
   async confirmDirectUpi(req, res, next) {
     try {
-      const { order_id, ref_id, utr_number, notifyRecipients = true } = req.body;
+      const { order_id, ref_id, utr_number, amount, notifyRecipients = config.autoNotifyOnPayment } = req.body;
       const targetId = order_id || ref_id;
 
       if (!targetId) {
@@ -196,13 +197,15 @@ class PaymentController {
       let dispatchSummary = null;
       if (notifyRecipients) {
         try {
+          const amtNum = amount ? parseFloat(amount) : null;
+          const amtStr = amtNum ? `₹${amtNum.toFixed(2)}` : '₹(amount)';
           dispatchSummary = await notificationService.sendToRecipients({
-            subject: 'Official Receipt: ₹1.00 Payment Confirmed via UPI',
-            message: `Your payment of ₹1.00 has been verified!\nReceipt No: ${receiptId}\nTransaction Ref (UTR): ${paymentId}\nStatus: Completed & Credited`,
+            subject: `Official Receipt: ${amtStr} Payment Confirmed via UPI`,
+            message: `Your payment of ${amtStr} has been verified!\nReceipt No: ${receiptId}\nTransaction Ref (UTR): ${paymentId}\nStatus: Completed & Credited`,
             metadata: {
               Receipt_Number: receiptId,
               Transaction_Ref: paymentId,
-              Amount: '₹1.00',
+              Amount: amtStr,
               Method: 'Direct UPI Transfer',
               Payee: 'Ravi Sehrawat (ravi123sehravat@okaxis)',
               Status: 'Verified & Settled',

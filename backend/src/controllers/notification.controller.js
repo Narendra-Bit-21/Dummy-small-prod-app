@@ -48,6 +48,41 @@ class NotificationController {
   }
 
   /**
+   * POST /api/notifications/dispatch-stream
+   * SSE endpoint — streams each send result as it completes
+   */
+  async streamNotifications(req, res, next) {
+    try {
+      const { recipients, channels, subject = 'Notification Alert', message, metadata = {}, amount = null } = req.body;
+
+      if (!message || message.trim() === '') {
+        return res.status(400).json({ success: false, message: 'The `message` parameter is required.' });
+      }
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      const dispatchSummary = await notificationService.sendToRecipients({
+        recipients, channels, subject, message, metadata, amount,
+        onResult: (item) => {
+          res.write(`data: ${JSON.stringify({ type: 'result', ...item })}\n\n`);
+        }
+      });
+
+      res.write(`data: ${JSON.stringify({ type: 'done', summary: dispatchSummary })}\n\n`);
+      res.end();
+    } catch (err) {
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+        res.end();
+      } catch {}
+      next(err);
+    }
+  }
+
+  /**
    * GET /api/notifications/history
    * Retrieve notification audit history logs
    */

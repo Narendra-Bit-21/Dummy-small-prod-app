@@ -9,6 +9,7 @@ const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   corsOrigin: process.env.CORS_ORIGIN || '*',
   databasePath: process.env.DATABASE_PATH || path.resolve(__dirname, '../../../database/app.db'),
+  autoNotifyOnPayment: process.env.AUTO_NOTIFY_ON_PAYMENT === 'true',
 
     // Cashfree Payments
   cashfree: {

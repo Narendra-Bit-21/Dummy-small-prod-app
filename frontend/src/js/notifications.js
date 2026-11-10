@@ -374,6 +374,7 @@ class NotificationsManager {
 
     this.logProgress(`[INIT] Preparing parallel dispatch to 2 recipients across ${this.selectedChannels.size} channel(s)...`);
 
+    const allResults = [];
     try {
       const amountInputEl = document.getElementById('payment-amount-input');
       const currentAmount = amountInputEl ? parseFloat(amountInputEl.value || 1) : 1;
@@ -385,19 +386,45 @@ class NotificationsManager {
         amount: currentAmount
       };
 
-      const dispatchResponse = await window.apiService.dispatchNotifications(payload);
+      const response = await fetch('/api/notifications/dispatch-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-      // Animate each recipient and channel result in the status matrix
-      const results = dispatchResponse.results || [];
-      await this.animateDispatchResults(results);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const sentCount = results.filter(r => r.status === 'sent' || r.status === 'success').length;
-      const simCount = results.filter(r => r.status === 'simulated').length;
-      const failCount = results.filter(r => r.status === 'failed').length;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'result') {
+              allResults.push(event);
+              this.updateMatrixBadge(event);
+              this.logProgress(`[${event.channel.toUpperCase()}] ${event.recipientName}: ${event.status.toUpperCase()} -> ${event.detail || event.error || event.notice || ''}`);
+            }
+          } catch {}
+        }
+      }
+
+      const sentCount = allResults.filter(r => r.status === 'sent' || r.status === 'success').length;
+      const simCount = allResults.filter(r => r.status === 'simulated').length;
+      const failCount = allResults.filter(r => r.status === 'failed').length;
       const summary = [`${sentCount} sent`];
       if (simCount) summary.push(`${simCount} simulated`);
       if (failCount) summary.push(`${failCount} failed`);
-      const toastType = failCount === results.length ? 'error' : sentCount > 0 ? 'success' : 'warning';
+      const toastType = failCount === allResults.length ? 'error' : sentCount > 0 ? 'success' : 'warning';
       window.app.showToast(toastType, 'Broadcast Complete', summary.join(', ') + '.');
       window.app.playTone('success');
       window.app.refreshHistory();
@@ -468,6 +495,30 @@ class NotificationsManager {
       this.logProgress(`[${item.channel.toUpperCase()}] ${item.recipientName || item.recipient_name}: ${item.status.toUpperCase()} -> ${item.detail || item.error || item.notice || ''}`);
       lucide.createIcons();
     }
+  }
+
+  updateMatrixBadge(item) {
+    const isR1 = (item.recipientName || item.recipient_name) === this.recipients[0].name;
+    let badgeEl = null;
+    if (isR1) {
+      if (item.channel === 'email') badgeEl = this.matrixR1Email;
+      else if (item.channel === 'whatsapp') badgeEl = this.matrixR1Whatsapp;
+      else if (item.channel === 'sms') badgeEl = this.matrixR1Sms;
+    } else {
+      if (item.channel === 'email') badgeEl = this.matrixR2Email;
+      else if (item.channel === 'whatsapp') badgeEl = this.matrixR2Whatsapp;
+      else if (item.channel === 'sms') badgeEl = this.matrixR2Sms;
+    }
+    if (!badgeEl) return;
+    const status = item.status;
+    if (status === 'sent' || status === 'success') {
+      badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-medium"><i data-lucide="check-circle-2" class="w-3 h-3 mr-1"></i> Sent</span>`;
+    } else if (status === 'simulated') {
+      badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-medium" title="Simulated — credentials not configured"><i data-lucide="eye" class="w-3 h-3 mr-1"></i> Simulated</span>`;
+    } else {
+      badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-medium" title="${item.error || item.detail || ''}"><i data-lucide="x-circle" class="w-3 h-3 mr-1"></i> Failed</span>`;
+    }
+    lucide.createIcons();
   }
 
   logProgress(text) {
