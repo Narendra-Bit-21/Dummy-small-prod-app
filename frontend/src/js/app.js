@@ -352,9 +352,9 @@ class AppController {
               ${n.subject || 'Multi-channel broadcast'}
             </td>
             <td class="px-6 py-4 text-xs">
-              ${n.status === 'success' 
+              ${['sent', 'simulated', 'success'].includes(n.status)
                 ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
-                     <i data-lucide="check" class="w-3 h-3 mr-1"></i> Delivered
+                     <i data-lucide="check" class="w-3 h-3 mr-1"></i> ${n.status === 'simulated' ? 'Simulated' : 'Delivered'}
                    </span>`
                 : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300" title="${n.detail || ''}">
                      <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> Failed

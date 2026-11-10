@@ -420,7 +420,18 @@ class ApiService {
   _logNotificationBatch(entries) {
     try {
       const history = this.getNotificationHistory();
-      const updated = [...entries, ...history].slice(0, 100);
+      const normalized = entries.map(e => e.recipientName ? {
+        id: `notif_${Math.random().toString(36).substring(2, 9)}`,
+        batch_id: e.batch_id || '',
+        recipient_name: e.recipientName,
+        recipient_target: e.target,
+        channel: e.channel,
+        subject: e.subject || '',
+        status: e.status,
+        detail: e.error || e.notice || `Dispatched via ${e.channel}`,
+        timestamp: new Date().toISOString()
+      } : e);
+      const updated = [...normalized, ...history].slice(0, 100);
       localStorage.setItem('qp_notif_history', JSON.stringify(updated));
     } catch (e) {
       console.error('[API] Failed to store notification audit log', e);
@@ -447,9 +458,9 @@ class ApiService {
   }
 
   _initLocalStorage() {
-    if (!localStorage.getItem('qp_recipients')) {
-      this.getRecipients();
-    }
+    // Always clear cached recipients so backend data (Pratishtha + Ravi) is fetched fresh
+    localStorage.removeItem('qp_recipients');
+    this.getRecipients();
   }
 }
 

@@ -414,7 +414,7 @@ class NotificationsManager {
     for (const item of results) {
       await new Promise(r => setTimeout(r, 200));
 
-      const isR1 = item.recipient_name === this.recipients[0].name;
+      const isR1 = (item.recipientName || item.recipient_name) === this.recipients[0].name;
       let badgeEl = null;
 
       if (isR1) {
@@ -428,14 +428,14 @@ class NotificationsManager {
       }
 
       if (badgeEl) {
-        if (item.status === 'success') {
+        if (['sent', 'simulated', 'success'].includes(item.status)) {
           badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-medium"><i data-lucide="check-circle-2" class="w-3 h-3 mr-1"></i> Sent</span>`;
         } else {
           badgeEl.innerHTML = `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 font-medium" title="${item.detail}"><i data-lucide="x-circle" class="w-3 h-3 mr-1"></i> Failed</span>`;
         }
       }
 
-      this.logProgress(`[${item.channel.toUpperCase()}] ${item.recipient_name}: ${item.status.toUpperCase()} -> ${item.detail}`);
+      this.logProgress(`[${item.channel.toUpperCase()}] ${item.recipientName || item.recipient_name}: ${item.status.toUpperCase()} -> ${item.detail || item.error || item.notice || ''}`);
       lucide.createIcons();
     }
   }

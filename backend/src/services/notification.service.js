@@ -336,13 +336,23 @@ class NotificationService {
     const results = [];
 
     for (const recipient of targetRecipients) {
+      const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+      const interpolatedMessage = message
+        .replace(/\{name\}/gi, recipient.name || 'Valued User')
+        .replace(/\{time\}/gi, now)
+        .replace(/\{amount\}/gi, '₹1.00')
+        .replace(/\{status\}/gi, 'CONFIRMED');
+      const interpolatedSubject = subject
+        .replace(/\{name\}/gi, recipient.name || 'Valued User')
+        .replace(/\{amount\}/gi, '₹1.00');
+
       // 1. Email Channel
       if (channelList.includes('email') && recipient.email) {
         const emailResult = await this.sendEmail({
           to: recipient.email,
           recipientName: recipient.name,
-          subject,
-          message,
+          subject: interpolatedSubject,
+          message: interpolatedMessage,
           metadata
         });
 
@@ -370,7 +380,7 @@ class NotificationService {
         const waResult = await this.sendWhatsApp({
           phone: recipient.whatsapp || recipient.phone,
           recipientName: recipient.name,
-          message
+          message: interpolatedMessage
         });
 
         await db.logNotification({
@@ -397,7 +407,7 @@ class NotificationService {
         const smsResult = await this.sendSMS({
           phone: recipient.phone,
           recipientName: recipient.name,
-          message
+          message: interpolatedMessage
         });
 
         await db.logNotification({

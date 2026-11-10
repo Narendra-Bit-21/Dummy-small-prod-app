@@ -345,7 +345,7 @@ class PaymentService {
           environment: config.cashfree.env
         };
       } catch (err) {
-        console.warn([PaymentService] Cashfree API notice: . Using simulated order.);
+        console.warn(`[PaymentService] Cashfree API notice: ${err.message}. Using simulated order.`);
       }
     }
 
