@@ -68,6 +68,14 @@ const config = {
   fast2sms: {
     apiKey: process.env.FAST2SMS_API_KEY || '',
     isConfigured: Boolean(process.env.FAST2SMS_API_KEY && process.env.FAST2SMS_API_KEY.trim().length > 10)
+  },
+
+  // Resend Email API
+  resend: {
+    apiKey: process.env.RESEND_API_KEY || '',
+    fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+    toOverride: process.env.RESEND_TO_OVERRIDE || '',
+    isConfigured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_'))
   }
 };
 

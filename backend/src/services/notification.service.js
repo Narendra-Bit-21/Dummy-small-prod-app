@@ -9,6 +9,13 @@ try {
   nodemailer = null;
 }
 
+let Resend = null;
+try {
+  Resend = require('resend').Resend;
+} catch (e) {
+  Resend = null;
+}
+
 class NotificationService {
   constructor() {
     this.emailTransporter = null;
@@ -124,6 +131,32 @@ class NotificationService {
 
     const html = this._buildEmailHtml({ recipientName, subject, message, metadata });
 
+    // Try Resend API first (works on Railway, no SMTP ports needed)
+    if (Resend && config.resend.isConfigured) {
+      try {
+        const resendClient = new Resend(config.resend.apiKey);
+        const toAddress = config.resend.toOverride || to;
+        const { data, error } = await resendClient.emails.send({
+          from: config.resend.fromEmail,
+          to: toAddress,
+          subject: subject || 'Notification Alert',
+          text: message,
+          html
+        });
+
+        if (error) {
+          console.error(`[NotificationService] Resend error to ${toAddress}: ${error.message}`);
+          return { success: false, status: 'failed', channel: 'email', target: toAddress, error: `Resend Error: ${error.message}` };
+        }
+
+        console.log(`[NotificationService] Email dispatched via Resend to ${toAddress} (id: ${data.id})`);
+        return { success: true, status: 'sent', channel: 'email', target: toAddress, externalId: data.id };
+      } catch (err) {
+        console.error(`[NotificationService] Resend exception: ${err.message}`);
+      }
+    }
+
+    // Fallback: Gmail SMTP
     if (this.emailTransporter && config.gmail.isConfigured) {
       try {
         const info = await this.emailTransporter.sendMail({
@@ -252,7 +285,7 @@ class NotificationService {
             headers: {
               authorization: config.fast2sms.apiKey
             },
-            timeout: 8000
+            timeout: 2500
           }
         );
 
