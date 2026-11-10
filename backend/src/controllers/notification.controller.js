@@ -13,7 +13,8 @@ class NotificationController {
         channels = ['email', 'whatsapp', 'sms'],
         subject = 'Notification Alert',
         message,
-        metadata = {}
+        metadata = {},
+        amount = null
       } = req.body;
 
       if (!message || message.trim() === '') {
@@ -28,6 +29,7 @@ class NotificationController {
         channels,
         subject,
         message,
+        amount,
         metadata
       });
 

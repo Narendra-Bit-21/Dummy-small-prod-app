@@ -72,7 +72,7 @@
               <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-300 bg-clip-text text-transparent">QuickPay & Notify</span>
               <span class="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">Studio</span>
             </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">₹1 Live Verification & Multi-Channel Dispatch</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block"><span id="header-subtitle">&#x20B9;1</span> Live Verification &amp; Multi-Channel Dispatch</p>
           </div>
         </div>
 
@@ -80,7 +80,7 @@
         <nav class="hidden md:flex space-x-1 border border-slate-200 dark:border-slate-800 p-1 rounded-xl bg-slate-100/70 dark:bg-slate-800/60">
           <button id="nav-tab-checkout" class="nav-tab-active flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold text-blue-600 transition">
             <i data-lucide="shopping-bag" class="w-4 h-4"></i>
-            <span>₹1 Checkout</span>
+            <span id="nav-checkout-label">&#x20B9;1 Checkout</span>
           </button>
           <button id="nav-tab-notifications" class="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">
             <i data-lucide="send" class="w-4 h-4"></i>
@@ -158,9 +158,9 @@
               <span>&bull;</span>
               <span>Amazon / Flipkart Inspired Fast Checkout</span>
             </div>
-            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">₹1.00 Production Verification Checkout</h1>
+            <h1 id="checkout-heading" class="text-2xl sm:text-3xl font-extrabold tracking-tight">&#x20B9;1.00 Payment Checkout</h1>
             <p class="text-blue-100/80 text-sm mt-1 max-w-2xl">
-              Execute a real or test ₹1 verification charge via official Razorpay Standard Checkout or scan dynamic NPCI UPI QR code.
+              Execute a real or test payment via official Razorpay Standard Checkout or scan dynamic NPCI UPI QR code.
             </p>
           </div>
           <div class="flex items-center space-x-3 bg-white/10 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/15">
@@ -184,9 +184,21 @@
             <div class="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
               <div class="flex items-center space-x-3">
                 <span class="flex items-center justify-center w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
-                <h2 class="text-lg font-bold">Select Payment Method</h2>
+                <h2 class="text-lg font-bold">Enter Amount & Select Method</h2>
               </div>
               <span class="text-xs text-slate-500 dark:text-slate-400">Guaranteed Instant Settlement</span>
+            </div>
+
+            <!-- Amount Input -->
+            <div class="mt-4 p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800/50">
+              <label class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-2">Payment Amount (INR)</label>
+              <div class="flex items-center space-x-3">
+                <span class="text-2xl font-extrabold text-blue-600">&#x20B9;</span>
+                <input id="payment-amount-input" type="number" min="1" max="100000" step="1" value="1"
+                  class="flex-1 px-4 py-2.5 rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-extrabold text-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  placeholder="Enter amount" />
+                <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">INR</span>
+              </div>
             </div>
 
             <!-- Payment Method Tabs -->
@@ -340,12 +352,13 @@
                   </div>
                 </div>
 
-                <!-- Simulation Trigger for QR -->
-                <div class="mt-5">
-                  <button id="btn-simulate-qr-scan" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition flex items-center justify-center mx-auto cursor-pointer">
-                    <i data-lucide="check-circle" class="w-4 h-4 mr-1.5"></i>
-                    <span>Simulate Mobile QR Scan Complete</span>
+                <!-- I've Paid Confirmation Button -->
+                <div class="mt-5 space-y-2">
+                  <button id="btn-simulate-qr-scan" class="w-full px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center cursor-pointer">
+                    <i data-lucide="check-circle-2" class="w-5 h-5 mr-2"></i>
+                    <span id="btn-paid-label">I've Paid — Confirm & Get Receipt</span>
                   </button>
+                  <p class="text-center text-xs text-slate-400 dark:text-slate-500">Tap after completing UPI payment to get your receipt</p>
                 </div>
 
               </div>
@@ -374,7 +387,7 @@
                 <p class="text-[11px] text-slate-500 dark:text-slate-400">SKU: PROD-VERIFY-001</p>
                 <div class="flex items-center space-x-1 mt-1">
                   <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.2 rounded">Instant Auth</span>
-                  <span class="text-[10px] text-slate-400">â€¢ Qty: 1</span>
+                  <span class="text-[10px] text-slate-400">&bull; Qty: 1</span>
                 </div>
               </div>
             </div>
@@ -383,11 +396,11 @@
             <div class="py-4 space-y-2 text-xs border-b border-slate-100 dark:border-slate-800">
               <div class="flex justify-between">
                 <span class="text-slate-500 dark:text-slate-400">Base Token Price</span>
-                <span class="font-medium text-slate-700 dark:text-slate-300">₹0.85</span>
+                <span id="order-base-price" class="font-medium text-slate-700 dark:text-slate-300">&#x20B9;0.85</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-slate-500 dark:text-slate-400">GST (18% Integrated)</span>
-                <span class="font-medium text-slate-700 dark:text-slate-300">₹0.15</span>
+                <span id="order-gst" class="font-medium text-slate-700 dark:text-slate-300">&#x20B9;0.15</span>
               </div>
               <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
                 <span>Delivery & Verification</span>
@@ -401,8 +414,8 @@
                 <div class="text-sm font-extrabold text-slate-900 dark:text-white">Total Amount</div>
                 <div class="text-[11px] text-slate-400">Inclusive of all taxes</div>
               </div>
-              <div class="text-2xl font-black text-blue-600 dark:text-blue-400">
-                ₹1.00
+              <div id="order-summary-total" class="text-2xl font-black text-blue-600 dark:text-blue-400">
+                &#x20B9;1.00
               </div>
             </div>
 
@@ -637,7 +650,7 @@
           <div class="p-3.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
             <div class="flex items-center space-x-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
               <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-              <span>Live Interpolation Preview (Recipient 1: Ravi Sehravat)</span>
+              <span>Live Interpolation Preview (Recipient 1: <span id="preview-recipient-name">...</span>)</span>
             </div>
             <div id="msg-preview-box">
               <em class="text-xs text-slate-400">Start typing in the composer to view live preview...</em>
@@ -737,8 +750,8 @@
               <!-- Recipient 1 Row -->
               <tr>
                 <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">
-                  <div>Ravi Sehravat</div>
-                  <div class="text-[10px] text-slate-400 font-mono">ravi123sehravat@gmail.com</div>
+                  <div id="matrix-r1-name">Pratishtha</div>
+                  <div class="text-[10px] text-slate-400 font-mono" id="matrix-r1-email-label">pratishthavsingh123@gmail.com</div>
                 </td>
                 <td class="px-4 py-3" id="matrix-r1-email">
                   <span class="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">Idle</span>
@@ -753,8 +766,8 @@
               <!-- Recipient 2 Row -->
               <tr>
                 <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">
-                  <div>Operations Team / QA Lead</div>
-                  <div class="text-[10px] text-slate-400 font-mono">operations@example.com</div>
+                  <div id="matrix-r2-name">Ravi</div>
+                  <div class="text-[10px] text-slate-400 font-mono" id="matrix-r2-email-label">kajupretty2202@gmail.com</div>
                 </td>
                 <td class="px-4 py-3" id="matrix-r2-email">
                   <span class="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">Idle</span>
@@ -983,9 +996,9 @@
   </footer>
 
   <!-- Application Scripts -->
-  <script src="src/js/api.js"></script>
-  <script src="src/js/payment.js"></script>
-  <script src="src/js/notifications.js"></script>
+  <script src="src/js/api.js?v=2"></script>
+  <script src="src/js/payment.js?v=2"></script>
+  <script src="src/js/notifications.js?v=2"></script>
   <script src="src/js/app.js"></script>
 </body>
 </html>

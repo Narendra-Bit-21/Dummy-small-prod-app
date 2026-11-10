@@ -66,7 +66,8 @@ class PaymentController {
         razorpay_order_id,
         razorpay_payment_id,
         razorpay_signature,
-        notifyRecipients = true
+        amount,
+        notifyRecipients = false
       } = req.body;
 
       if (!razorpay_order_id || !razorpay_payment_id) {
@@ -92,14 +93,17 @@ class PaymentController {
       // Optionally dispatch notifications to the 2 recipients upon payment confirmation
       let dispatchSummary = null;
       if (notifyRecipients) {
+        const paidAmount = amount ? parseFloat(amount) : null;
+        const amtStr = paidAmount ? `₹${paidAmount.toFixed(2)}` : '₹(amount)';
         try {
           dispatchSummary = await notificationService.sendToRecipients({
-            subject: 'Payment Confirmation: ₹1 Received',
-            message: `A payment of ₹1.00 was successfully processed!\nOrder ID: ${razorpay_order_id}\nPayment ID: ${razorpay_payment_id}`,
+            subject: `Payment Confirmation: ${amtStr} Received`,
+            message: `A payment of ${amtStr} was successfully processed!\nOrder ID: ${razorpay_order_id}\nPayment ID: ${razorpay_payment_id}`,
+            amount: paidAmount,
             metadata: {
               Order_ID: razorpay_order_id,
               Payment_ID: razorpay_payment_id,
-              Amount: '₹1.00',
+              Amount: amtStr,
               Status: 'Paid',
               Gateway: 'Razorpay'
             }

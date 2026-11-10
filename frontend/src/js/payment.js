@@ -17,7 +17,14 @@ class PaymentManager {
     this.bindEvents();
   }
 
+  getAmount() {
+    const input = document.getElementById('payment-amount-input');
+    const val = parseFloat(input ? input.value : 1);
+    return isNaN(val) || val < 1 ? 1 : Math.round(val * 100) / 100;
+  }
+
   initElements() {
+    this.amountInput = document.getElementById('payment-amount-input');
     // Payment Method selection tabs/radios
     this.methodRazorpayBtn = document.getElementById('method-razorpay-btn');
     this.methodUpiQrBtn = document.getElementById('method-upiqr-btn');
@@ -119,6 +126,31 @@ class PaymentManager {
     if (this.btnPaytm) this.btnPaytm.addEventListener('click', () => openDeepLink('paytmmp://'));
     if (this.btnBhim) this.btnBhim.addEventListener('click', () => openDeepLink('upi://'));
 
+    // Update all amount displays when amount changes
+    if (this.amountInput) {
+      this.amountInput.addEventListener('input', () => {
+        const amt = this.getAmount();
+        const label = document.getElementById('btn-paid-label');
+        if (label) label.textContent = `I've Paid ₹${amt.toFixed(2)} — Confirm & Get Receipt`;
+        const heading = document.getElementById('checkout-heading');
+        if (heading) heading.textContent = `₹${amt.toFixed(2)} Payment Checkout`;
+        const navLabel = document.getElementById('nav-checkout-label');
+        if (navLabel) navLabel.textContent = `₹${amt.toFixed(2)} Checkout`;
+        const subtitle = document.getElementById('header-subtitle');
+        if (subtitle) subtitle.textContent = `₹${amt.toFixed(2)}`;
+        const total = document.getElementById('order-summary-total');
+        if (total) total.textContent = `₹${amt.toFixed(2)}`;
+        const base = amt / 1.18;
+        const gst = amt - base;
+        const baseEl = document.getElementById('order-base-price');
+        if (baseEl) baseEl.textContent = `₹${base.toFixed(2)}`;
+        const gstEl = document.getElementById('order-gst');
+        if (gstEl) gstEl.textContent = `₹${gst.toFixed(2)}`;
+        this.setPayButtonLoading(false);
+        this.currentUpiData = null; // force QR regeneration on next switch
+      });
+    }
+
     // Receipt Modal Actions
     if (this.receiptModalClose) {
       this.receiptModalClose.addEventListener('click', () => this.closeReceiptModal());
@@ -169,7 +201,8 @@ class PaymentManager {
       this.setPayButtonLoading(true, 'Initializing Gateway...');
 
       // 1. Create order on backend / mock
-      const order = await window.apiService.createPaymentOrder(1.00);
+      const amount = this.getAmount();
+      const order = await window.apiService.createPaymentOrder(amount);
       this.currentOrder = order;
 
       // 2. Check if Razorpay script is loaded
@@ -182,10 +215,10 @@ class PaymentManager {
 
       const options = {
         key: keyId,
-        amount: order.amount || 100, // 100 paise = ₹1.00
+        amount: order.amount || Math.round(amount * 100),
         currency: order.currency || 'INR',
         name: 'QuickPay & Notify Studio',
-        description: 'Production Verification Token (₹1.00)',
+        description: `Payment of ₹${amount.toFixed(2)}`,
         order_id: order.order_id,
         image: 'https://cdn-icons-png.flaticon.com/512/9131/9131529.png',
         prefill: {
@@ -200,25 +233,32 @@ class PaymentManager {
         theme: {
           color: '#2563eb'
         },
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true
+        },
         handler: async (response) => {
           this.setPayButtonLoading(true, 'Verifying Payment...');
           try {
             const verifyRes = await window.apiService.verifyPayment({
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
+              razorpay_signature: response.razorpay_signature,
+              amount
             });
 
             this.showReceipt(verifyRes.transaction || {
               id: `txn_${Date.now()}`,
               order_id: response.razorpay_order_id,
               payment_id: response.razorpay_payment_id,
-              amount: 1.00,
+              amount,
               method: 'Razorpay Gateway',
               created_at: new Date().toISOString()
             });
 
-            window.app.showToast('success', 'Payment Verified!', '₹1.00 payment received and signature verified successfully.');
+            window.app.showToast('success', 'Payment Verified!', `₹${amount.toFixed(2)} payment received and signature verified successfully.`);
             window.app.playTone('success');
             window.app.refreshHistory();
           } catch (e) {
@@ -271,22 +311,25 @@ class PaymentManager {
    * Simulate payment completion (Useful for quick tests & desktop QR demo)
    */
   async simulateDirectPayment(methodName = 'Test Verification', orderId = null) {
+    const amount = this.getAmount();
     const fakeOrderId = orderId || `order_${Math.random().toString(36).substring(2, 10)}`;
     const fakePaymentId = `pay_${Math.random().toString(36).substring(2, 12)}`;
-    
-    window.app.showToast('info', 'Processing Transaction', 'Validating ₹1.00 payment transaction...');
+
+    window.app.showToast('info', 'Processing Transaction', `Validating ₹${amount.toFixed(2)} payment transaction...`);
 
     const verifyRes = await window.apiService.verifyPayment({
       razorpay_order_id: fakeOrderId,
       razorpay_payment_id: fakePaymentId,
-      razorpay_signature: 'sig_mock_verified_' + Date.now()
+      razorpay_signature: 'sig_mock_verified_' + Date.now(),
+      amount
     });
 
     const txn = verifyRes.transaction;
     txn.method = methodName;
+    txn.amount = amount;
 
     this.showReceipt(txn);
-    window.app.showToast('success', '₹1.00 Received!', `Payment completed via ${methodName}. Receipt generated.`);
+    window.app.showToast('success', `₹${amount.toFixed(2)} Confirmed!`, `Payment completed via ${methodName}. Receipt generated.`);
     window.app.playTone('success');
     window.app.refreshHistory();
   }
@@ -302,7 +345,8 @@ class PaymentManager {
         lucide.createIcons();
       }
 
-      const upiData = await window.apiService.generateUpiQr(1.00, 'Verification Token');
+      const amount = this.getAmount();
+      const upiData = await window.apiService.generateUpiQr(amount, `Payment of ₹${amount.toFixed(2)}`);
       this.currentUpiData = upiData;
 
       if (this.upiQrDisplay) {
@@ -487,16 +531,18 @@ Thank you for verifying with QuickPay Studio!
     }
   }
 
-  setPayButtonLoading(loading, label = 'Pay ₹1.00') {
+  setPayButtonLoading(loading, label = null) {
     if (!this.btnPayRazorpay) return;
+    const amount = this.getAmount();
+    const defaultLabel = `Pay ₹${amount.toFixed(2)} via Razorpay Standard`;
     this.btnPayRazorpay.disabled = loading;
     if (loading) {
-      this.btnPayRazorpay.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 mr-2 animate-spin"></i> ${label}`;
+      this.btnPayRazorpay.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 mr-2 animate-spin"></i> ${label || 'Processing...'}`;
     } else {
       this.btnPayRazorpay.innerHTML = `
         <span class="flex items-center justify-center">
           <i data-lucide="lock" class="w-5 h-5 mr-2"></i>
-          <span>Pay ₹1.00 via Razorpay Standard</span>
+          <span>${defaultLabel}</span>
         </span>`;
     }
     lucide.createIcons();

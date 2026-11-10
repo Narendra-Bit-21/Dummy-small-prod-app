@@ -137,7 +137,7 @@ class ApiService {
           this.logPaymentRecord({
             order_id: verificationData.razorpay_order_id,
             payment_id: verificationData.razorpay_payment_id,
-            amount: 1.00,
+            amount: verificationData.amount || 1.00,
             method: 'Razorpay Gateway',
             status: 'success',
             created_at: new Date().toISOString()
@@ -155,7 +155,7 @@ class ApiService {
       id: `txn_${Date.now().toString(36)}`,
       order_id: verificationData.razorpay_order_id || `order_mock_${Date.now()}`,
       payment_id: verificationData.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 12)}`,
-      amount: 1.00,
+      amount: verificationData.amount || 1.00,
       currency: 'INR',
       method: 'Razorpay Standard',
       status: 'success',
@@ -251,6 +251,7 @@ class ApiService {
    * Retrieve Recipient Address Book (Pre-loaded with 2 slots)
    */
   async getRecipients() {
+    // Always fetch from backend when online — never serve stale localStorage
     if (this.isOnline) {
       try {
         const res = await fetch(`${this.baseUrl}/recipients`);
@@ -262,32 +263,25 @@ class ApiService {
           }
         }
       } catch (err) {
-        console.warn('[API] Using local recipient store');
+        console.warn('[API] Backend unreachable, falling back to local store');
       }
     }
 
-    const localData = localStorage.getItem('qp_recipients');
-    if (localData) {
-      try {
-        return JSON.parse(localData);
-      } catch {}
-    }
-
-    // Default pre-loaded 2 recipients
+    // Fallback: hardcoded real defaults (only used when backend is offline)
     const defaults = [
       {
         id: 1,
         name: 'Pratishtha',
-        phone: '+91 7355062427',
-        whatsapp: '+91 7355062427',
+        phone: '+917355062427',
+        whatsapp: '+917355062427',
         email: 'pratishthavsingh123@gmail.com',
         role: 'Primary Account / Admin'
       },
       {
         id: 2,
         name: 'Ravi',
-        phone: '+91 8769030475',
-        whatsapp: '+91 8769030475',
+        phone: '+918769030475',
+        whatsapp: '+918769030475',
         email: 'kajupretty2202@gmail.com',
         role: 'Secondary Recipient / QA'
       }
@@ -325,7 +319,7 @@ class ApiService {
    * Dispatch Multi-Channel Notifications to Recipients
    */
   async dispatchNotifications(payload) {
-    const { recipients, channels, subject, message } = payload;
+    const { recipients, channels, subject, message, amount } = payload;
     const batchId = `BATCH-${Date.now().toString(36).toUpperCase()}`;
     const timestamp = new Date().toISOString();
 
@@ -342,6 +336,7 @@ class ApiService {
             channels,
             subject,
             message,
+            amount: amount || null,
             timestamp
           })
         });

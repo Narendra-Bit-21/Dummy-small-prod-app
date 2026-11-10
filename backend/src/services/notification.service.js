@@ -318,7 +318,7 @@ class NotificationService {
   /**
    * Batch Sender: Dispatches to the 2 recipients across all selected channels
    */
-  async sendToRecipients({ recipients = null, channels = ['email', 'whatsapp', 'sms'], subject = 'Important Alert', message, metadata = {} }) {
+  async sendToRecipients({ recipients = null, channels = ['email', 'whatsapp', 'sms'], subject = 'Important Alert', message, metadata = {}, amount = null }) {
     if (!message || message.trim() === '') {
       throw new Error('Message content is required for dispatch.');
     }
@@ -337,14 +337,15 @@ class NotificationService {
 
     for (const recipient of targetRecipients) {
       const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+      const amountStr = amount ? `₹${parseFloat(amount).toFixed(2)}` : '₹1.00';
       const interpolatedMessage = message
         .replace(/\{name\}/gi, recipient.name || 'Valued User')
         .replace(/\{time\}/gi, now)
-        .replace(/\{amount\}/gi, '₹1.00')
+        .replace(/\{amount\}/gi, amountStr)
         .replace(/\{status\}/gi, 'CONFIRMED');
       const interpolatedSubject = subject
         .replace(/\{name\}/gi, recipient.name || 'Valued User')
-        .replace(/\{amount\}/gi, '₹1.00');
+        .replace(/\{amount\}/gi, amountStr);
 
       // 1. Email Channel
       if (channelList.includes('email') && recipient.email) {

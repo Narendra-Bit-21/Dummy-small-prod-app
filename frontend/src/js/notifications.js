@@ -146,6 +146,8 @@ class NotificationsManager {
 
     const r1Label = document.getElementById('rec1-display-name');
     if (r1Label) r1Label.textContent = r1.name || 'Recipient 1';
+    const previewNameLabel = document.getElementById('preview-recipient-name');
+    if (previewNameLabel) previewNameLabel.textContent = r1.name || 'Recipient 1';
 
     if (this.r2Name) this.r2Name.value = r2.name || '';
     if (this.r2Phone) this.r2Phone.value = r2.phone || '';
@@ -154,6 +156,16 @@ class NotificationsManager {
 
     const r2Label = document.getElementById('rec2-display-name');
     if (r2Label) r2Label.textContent = r2.name || 'Recipient 2';
+
+    // Update delivery matrix row labels
+    const mr1Name = document.getElementById('matrix-r1-name');
+    if (mr1Name) mr1Name.textContent = r1.name || 'Recipient 1';
+    const mr1Email = document.getElementById('matrix-r1-email-label');
+    if (mr1Email) mr1Email.textContent = r1.email || '';
+    const mr2Name = document.getElementById('matrix-r2-name');
+    if (mr2Name) mr2Name.textContent = r2.name || 'Recipient 2';
+    const mr2Email = document.getElementById('matrix-r2-email-label');
+    if (mr2Email) mr2Email.textContent = r2.email || '';
   }
 
   getRecipientsFromFields() {
@@ -204,18 +216,18 @@ class NotificationsManager {
     const defaults = [
       {
         id: 1,
-        name: 'Ravi Sehravat',
-        phone: '+91 9876543210',
-        whatsapp: '+91 9876543210',
-        email: 'ravi123sehravat@gmail.com',
+        name: 'Pratishtha',
+        phone: '+917355062427',
+        whatsapp: '+917355062427',
+        email: 'pratishthavsingh123@gmail.com',
         role: 'Primary Account / Admin'
       },
       {
         id: 2,
-        name: 'Operations Team Lead',
-        phone: '+91 9811223344',
-        whatsapp: '+91 9811223344',
-        email: 'operations@example.com',
+        name: 'Ravi',
+        phone: '+918769030475',
+        whatsapp: '+918769030475',
+        email: 'kajupretty2202@gmail.com',
         role: 'Secondary Recipient / QA'
       }
     ];
@@ -251,15 +263,17 @@ class NotificationsManager {
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     
     // Replace placeholders
+    const amountInput = document.getElementById('payment-amount-input');
+    const liveAmount = amountInput ? `₹${parseFloat(amountInput.value || 1).toFixed(2)}` : '₹1.00';
     const renderedBody = rawBody
       .replace(/\{name\}/g, r1.name || 'Valued User')
       .replace(/\{time\}/g, now)
-      .replace(/\{amount\}/g, '₹1.00')
+      .replace(/\{amount\}/g, liveAmount)
       .replace(/\{status\}/g, 'CONFIRMED');
 
     const renderedSubject = rawSubject
       .replace(/\{name\}/g, r1.name || 'Valued User')
-      .replace(/\{amount\}/g, '₹1.00');
+      .replace(/\{amount\}/g, liveAmount);
 
     this.previewBox.innerHTML = `
       <div class="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
@@ -271,16 +285,18 @@ class NotificationsManager {
 
   applyPaymentTemplate(txn = null) {
     const txnId = txn ? txn.payment_id : `pay_${Math.random().toString(36).substring(2, 9)}`;
-    const timeStr = new Date().toLocaleTimeString();
+    const amountInput = document.getElementById('payment-amount-input');
+    const amt = txn ? (txn.amount || parseFloat(amountInput?.value || 1)) : parseFloat(amountInput?.value || 1);
+    const amtStr = `₹${parseFloat(amt).toFixed(2)}`;
 
     if (this.subjectInput) {
-      this.subjectInput.value = `✅ Payment Received: ₹1.00 - Production Verification Token`;
+      this.subjectInput.value = `✅ Payment Received: ${amtStr} - Production Verification Token`;
     }
     if (this.messageInput) {
-      this.messageInput.value = `Hi {name},\n\nYour transaction of ₹1.00 for Production Verification Token has been successfully verified & confirmed.\n\nTransaction ID: ${txnId}\nStatus: {status}\nTimestamp: {time}\nSender: ${window.apiService.senderEmail}\n\nThank you for using QuickPay & Notify Studio.`;
+      this.messageInput.value = `Hi {name},\n\nYour transaction of ${amtStr} for Production Verification Token has been successfully verified & confirmed.\n\nTransaction ID: ${txnId}\nStatus: {status}\nTimestamp: {time}\nSender: ${window.apiService.senderEmail}\n\nThank you for using QuickPay & Notify Studio.`;
     }
     this.updatePreview();
-    window.app.showToast('info', 'Template Applied', 'Payment Confirmation ₹1 template loaded.');
+    window.app.showToast('info', 'Template Applied', `Payment Confirmation ${amtStr} template loaded.`);
   }
 
   applyHelloTemplate() {
@@ -359,11 +375,14 @@ class NotificationsManager {
     this.logProgress(`[INIT] Preparing parallel dispatch to 2 recipients across ${this.selectedChannels.size} channel(s)...`);
 
     try {
+      const amountInputEl = document.getElementById('payment-amount-input');
+      const currentAmount = amountInputEl ? parseFloat(amountInputEl.value || 1) : 1;
       const payload = {
         recipients: this.recipients,
         channels: Array.from(this.selectedChannels),
         subject: subject || 'QuickPay Multi-Channel Notification',
-        message: message
+        message: message,
+        amount: currentAmount
       };
 
       const dispatchResponse = await window.apiService.dispatchNotifications(payload);
