@@ -236,6 +236,116 @@ class ApiService {
   }
 
   /**
+   * Generate a Razorpay-managed verified dynamic QR (QR Codes API).
+   * Returns { success, qr_id, qr_image_url, ... } or { success:false, message } when
+   * Razorpay is not configured / the backend is offline.
+   */
+  async generateRazorpayQr(amountInInr = 1.00, description = null) {
+    const amountInPaise = Math.round(amountInInr * 100);
+
+    if (!this.isOnline) {
+      return {
+        success: false,
+        message: 'Backend is offline. Razorpay verified QR requires a live server connection.'
+      };
+    }
+
+    try {
+      const res = await fetch(`${this.baseUrl}/payment/generate-razorpay-qr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amountInPaise, description })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          message: data.message || data.error || 'Could not generate Razorpay verified QR.'
+        };
+      }
+      return data;
+    } catch (err) {
+      console.warn('[API] Razorpay QR endpoint unreachable', err);
+      return { success: false, message: 'Razorpay QR service unreachable.' };
+    }
+  }
+
+  /**
+   * Poll a Razorpay QR's payment status. Returns { success, status, paid, payment_id }.
+   */
+  async getRazorpayQrStatus(qrId) {
+    if (!this.isOnline || !qrId) {
+      return { success: false, paid: false, status: 'unknown' };
+    }
+    try {
+      const res = await fetch(`${this.baseUrl}/payment/razorpay-qr-status/${encodeURIComponent(qrId)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { success: false, paid: false, status: data.status || 'unknown', message: data.message };
+      }
+      return data;
+    } catch (err) {
+      console.warn('[API] Razorpay QR status endpoint unreachable', err);
+      return { success: false, paid: false, status: 'unknown' };
+    }
+  }
+
+  /**
+   * Generate a Cashfree-managed verified dynamic UPI QR.
+   * Returns { success, order_id, qr_image_url (data:image/png;base64 URI), ... } or
+   * { success:false, message } when Cashfree is not configured / the backend is offline.
+   */
+  async generateCashfreeQr(amountInInr = 1.00, description = null) {
+    const amountInPaise = Math.round(amountInInr * 100);
+
+    if (!this.isOnline) {
+      return {
+        success: false,
+        message: 'Backend is offline. Cashfree verified QR requires a live server connection.'
+      };
+    }
+
+    try {
+      const res = await fetch(`${this.baseUrl}/payment/generate-cashfree-qr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amountInPaise, description })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          message: data.message || data.error || 'Could not generate Cashfree verified QR.'
+        };
+      }
+      return data;
+    } catch (err) {
+      console.warn('[API] Cashfree QR endpoint unreachable', err);
+      return { success: false, message: 'Cashfree QR service unreachable.' };
+    }
+  }
+
+  /**
+   * Poll a Cashfree QR order's payment status. Returns { success, status, paid, payment_id }.
+   */
+  async getCashfreeQrStatus(orderId) {
+    if (!this.isOnline || !orderId) {
+      return { success: false, paid: false, status: 'unknown' };
+    }
+    try {
+      const res = await fetch(`${this.baseUrl}/payment/cashfree-qr-status/${encodeURIComponent(orderId)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { success: false, paid: false, status: data.status || 'unknown', message: data.message };
+      }
+      return data;
+    } catch (err) {
+      console.warn('[API] Cashfree QR status endpoint unreachable', err);
+      return { success: false, paid: false, status: 'unknown' };
+    }
+  }
+
+  /**
    * Log payment record to history
    */
   logPaymentRecord(record) {

@@ -202,8 +202,8 @@
             </div>
 
             <!-- Payment Method Tabs -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-              
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
+
               <!-- Tab 1: Razorpay Gateway -->
               <button id="method-razorpay-btn" class="flex items-start p-4 rounded-xl border-2 border-blue-600 bg-blue-50/50 dark:bg-blue-900/20 text-left transition relative">
                 <div class="p-2 rounded-lg bg-blue-600 text-white mr-3 flex-shrink-0">
@@ -232,6 +232,38 @@
                   </div>
                   <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     Instant NPCI QR for Google Pay, PhonePe, and Paytm deep-links.
+                  </p>
+                </div>
+              </button>
+
+              <!-- Tab 3: Razorpay Verified QR (auto-confirmed via webhook) -->
+              <button id="method-razorpay-qr-btn" class="flex items-start p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900 text-left transition">
+                <div class="p-2 rounded-lg bg-emerald-600 text-white mr-3 flex-shrink-0">
+                  <i data-lucide="scan-line" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="font-bold text-sm">Razorpay Verified QR</span>
+                    <span class="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 rounded font-semibold">Auto-Verified</span>
+                  </div>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Razorpay-managed dynamic QR, payment confirmed automatically.
+                  </p>
+                </div>
+              </button>
+
+              <!-- Tab 4: Cashfree Verified QR (auto-confirmed via status polling) -->
+              <button id="method-cashfree-qr-btn" class="flex items-start p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900 text-left transition">
+                <div class="p-2 rounded-lg bg-violet-600 text-white mr-3 flex-shrink-0">
+                  <i data-lucide="scan-line" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="font-bold text-sm">Cashfree Verified QR</span>
+                    <span class="text-[10px] bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 px-1.5 py-0.2 rounded font-semibold">Auto-Verified</span>
+                  </div>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Cashfree-managed dynamic UPI QR, payment confirmed automatically.
                   </p>
                 </div>
               </button>
@@ -360,6 +392,100 @@
                   </button>
                   <p class="text-center text-xs text-slate-400 dark:text-slate-500">Tap after completing UPI payment to get your receipt</p>
                 </div>
+
+              </div>
+            </div>
+
+            <!-- View 3: Razorpay Verified QR Code View (auto-confirmed, no manual tap) -->
+            <div id="razorpay-qr-method-view" class="mt-6 space-y-5 hidden">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Razorpay Verified Dynamic QR</h3>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">Scan with any UPI app. Payment is confirmed automatically — no manual tap required.</p>
+                </div>
+                <button id="btn-generate-razorpay-qr" class="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 text-xs font-semibold flex items-center transition">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i> Regenerate QR
+                </button>
+              </div>
+
+              <!-- QR Display Box -->
+              <div id="razorpay-qr-display" class="p-6 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-center">
+
+                <!-- QR Frame with Corner Brackets -->
+                <div class="qr-container mx-auto">
+                  <div class="qr-corner qr-corner-tl"></div>
+                  <div class="qr-corner qr-corner-tr"></div>
+                  <div class="qr-corner qr-corner-bl"></div>
+                  <div class="qr-corner qr-corner-br"></div>
+                  <div class="qr-scan-line"></div>
+
+                  <img id="razorpay-qr-image" class="hidden w-[200px] h-[200px] mx-auto rounded-lg bg-white" alt="Razorpay Verified QR">
+                  <div id="razorpay-qr-placeholder" class="flex items-center justify-center min-w-[200px] min-h-[200px] text-xs text-slate-400">
+                    Generating secure QR…
+                  </div>
+                </div>
+
+                <!-- Live verification status -->
+                <div class="mt-4 max-w-xs mx-auto">
+                  <div id="razorpay-qr-status" class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
+                    <i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i>
+                    <span>Waiting for payment…</span>
+                  </div>
+                  <div class="text-[11px] text-slate-500 mt-3">
+                    QR ID: <span id="razorpay-qr-id" class="font-mono font-semibold text-slate-700 dark:text-slate-300">—</span>
+                  </div>
+                </div>
+
+                <p class="mt-4 text-[11px] text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
+                  Scan with Google Pay, PhonePe, Paytm, or any UPI app. This screen updates automatically once Razorpay confirms the payment via webhook.
+                </p>
+
+              </div>
+            </div>
+
+            <!-- View 4: Cashfree Verified QR Code View (auto-confirmed, no manual tap) -->
+            <div id="cashfree-qr-method-view" class="mt-6 space-y-5 hidden">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Cashfree Verified Dynamic QR</h3>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">Scan with any UPI app. Payment is confirmed automatically — no manual tap required.</p>
+                </div>
+                <button id="btn-generate-cashfree-qr" class="px-3 py-1.5 rounded-lg bg-violet-50 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 hover:bg-violet-100 text-xs font-semibold flex items-center transition">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i> Regenerate QR
+                </button>
+              </div>
+
+              <!-- QR Display Box -->
+              <div id="cashfree-qr-display" class="p-6 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-center">
+
+                <!-- QR Frame with Corner Brackets -->
+                <div class="qr-container mx-auto">
+                  <div class="qr-corner qr-corner-tl"></div>
+                  <div class="qr-corner qr-corner-tr"></div>
+                  <div class="qr-corner qr-corner-bl"></div>
+                  <div class="qr-corner qr-corner-br"></div>
+                  <div class="qr-scan-line"></div>
+
+                  <img id="cashfree-qr-image" class="hidden w-[200px] h-[200px] mx-auto rounded-lg bg-white" alt="Cashfree Verified QR">
+                  <div id="cashfree-qr-placeholder" class="flex items-center justify-center min-w-[200px] min-h-[200px] text-xs text-slate-400">
+                    Generating secure QR…
+                  </div>
+                </div>
+
+                <!-- Live verification status -->
+                <div class="mt-4 max-w-xs mx-auto">
+                  <div id="cashfree-qr-status" class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
+                    <i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i>
+                    <span>Waiting for payment…</span>
+                  </div>
+                  <div class="text-[11px] text-slate-500 mt-3">
+                    Order ID: <span id="cashfree-qr-id" class="font-mono font-semibold text-slate-700 dark:text-slate-300">—</span>
+                  </div>
+                </div>
+
+                <p class="mt-4 text-[11px] text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
+                  Scan with Google Pay, PhonePe, Paytm, or any UPI app. This screen updates automatically once Cashfree confirms the payment.
+                </p>
 
               </div>
             </div>
@@ -989,8 +1115,8 @@
   <!-- Footer -->
 
   <!-- Application Scripts -->
-  <script src="src/js/api.js?v=3"></script>
-  <script src="src/js/payment.js?v=3"></script>
+  <script src="src/js/api.js?v=4"></script>
+  <script src="src/js/payment.js?v=4"></script>
   <script src="src/js/notifications.js?v=3"></script>
   <script src="src/js/app.js"></script>
 </body>

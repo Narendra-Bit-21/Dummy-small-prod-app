@@ -217,6 +217,222 @@ class PaymentController {
   }
 
   /**
+   * POST /api/payment/generate-razorpay-qr
+   * Generate a Razorpay-managed dynamic UPI QR (QR Codes API). Payment is VERIFIED
+   * via the qr_code.credited webhook, unlike the trust-based Direct UPI QR.
+   */
+  async generateRazorpayQr(req, res, next) {
+    try {
+      const { amount = 100, description } = req.body;
+
+      // Amount is always supplied in paise by the frontend (₹1 = 100 paise) — same bounds as createOrder
+      const numAmount = Number(amount);
+      if (
+        !Number.isFinite(numAmount) ||
+        !Number.isInteger(numAmount) ||
+        numAmount < 100 ||
+        numAmount > MAX_AMOUNT_RUPEES * 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `amount must be an integer in paise between 100 (₹1) and ${MAX_AMOUNT_RUPEES * 100} (₹${MAX_AMOUNT_RUPEES}).`
+        });
+      }
+      const amountInRupees = numAmount / 100;
+
+      const qrData = await paymentService.createRazorpayQr({
+        amount: amountInRupees,
+        description: description || `QuickPay Verified QR — ₹${amountInRupees.toFixed(2)}`
+      });
+
+      // Razorpay not configured on the server: report clearly (503), never fake a QR
+      if (!qrData.success) {
+        return res.status(503).json(qrData);
+      }
+
+      return res.status(200).json({
+        success: true,
+        qr_id: qrData.qrId,
+        qr_image_url: qrData.qrImageUrl,
+        amount: qrData.amount,
+        status: qrData.status,
+        data: qrData
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/payment/razorpay-qr-status/:qrId
+   * Poll whether a Razorpay QR has been paid (DB first, Razorpay fetchAllPayments fallback).
+   */
+  async getRazorpayQrStatus(req, res, next) {
+    try {
+      const { qrId } = req.params;
+      if (!qrId) {
+        return res.status(400).json({ success: false, message: 'qrId is required.' });
+      }
+
+      const result = await paymentService.getRazorpayQrStatus(qrId);
+
+      return res.status(200).json({
+        success: true,
+        qr_id: qrId,
+        status: result.status,
+        paid: result.paid,
+        payment_id: result.paymentId || null,
+        data: result
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/payment/generate-cashfree-qr
+   * Generate a Cashfree-managed dynamic UPI QR (order + UPI qrcode session). Payment is VERIFIED
+   * by polling Cashfree's order payments API (webhook is an optional fast path).
+   */
+  async generateCashfreeQr(req, res, next) {
+    try {
+      const { amount = 100, description } = req.body;
+
+      // Amount is always supplied in paise by the frontend (₹1 = 100 paise) — same bounds as createOrder
+      const numAmount = Number(amount);
+      if (
+        !Number.isFinite(numAmount) ||
+        !Number.isInteger(numAmount) ||
+        numAmount < 100 ||
+        numAmount > MAX_AMOUNT_RUPEES * 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `amount must be an integer in paise between 100 (₹1) and ${MAX_AMOUNT_RUPEES * 100} (₹${MAX_AMOUNT_RUPEES}).`
+        });
+      }
+      const amountInRupees = numAmount / 100;
+
+      const qrData = await paymentService.createCashfreeQr({
+        amount: amountInRupees,
+        description: description || `QuickPay Cashfree QR — ₹${amountInRupees.toFixed(2)}`
+      });
+
+      // Cashfree not configured / API failure: report clearly (503), never fake a QR
+      if (!qrData.success) {
+        return res.status(503).json(qrData);
+      }
+
+      return res.status(200).json({
+        success: true,
+        order_id: qrData.orderId,
+        cf_order_id: qrData.cfOrderId,
+        qr_image_url: qrData.qrImageUrl,
+        amount: qrData.amount,
+        status: qrData.status,
+        data: qrData
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/payment/cashfree-qr-status/:orderId
+   * Poll whether a Cashfree QR order has been paid (DB first, Cashfree order payments API next).
+   */
+  async getCashfreeQrStatus(req, res, next) {
+    try {
+      const { orderId } = req.params;
+      if (!orderId || !/^[A-Za-z0-9_-]{1,50}$/.test(orderId)) {
+        return res.status(400).json({ success: false, message: 'A valid orderId is required.' });
+      }
+
+      const result = await paymentService.getCashfreeQrStatus(orderId);
+
+      // Auto-dispatch receipt only on the first poll tick that detects payment, and only when enabled
+      if (result.newlyPaid && config.autoNotifyOnPayment) {
+        const amtStr = Number.isFinite(result.amount) ? `₹${result.amount.toFixed(2)}` : '₹(amount)';
+        try {
+          await notificationService.sendToRecipients({
+            subject: `Verified QR Payment: ${amtStr} Received (Cashfree)`,
+            message: `A Cashfree-verified QR payment of ${amtStr} was received and confirmed.\nPayment ID: ${result.paymentId}\nOrder ID: ${orderId}`,
+            metadata: {
+              Payment_ID: result.paymentId,
+              Order_ID: orderId,
+              Amount: amtStr,
+              Method: 'Cashfree Verified QR (UPI)',
+              Status: 'Paid & Verified',
+              Timestamp: new Date().toISOString()
+            }
+          });
+          console.log(`[PaymentController] Cashfree poll auto-dispatched receipts for payment ${result.paymentId}`);
+        } catch (notifErr) {
+          console.warn(`[PaymentController] Cashfree poll notification dispatch notice: ${notifErr.message}`);
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        order_id: orderId,
+        status: result.status,
+        paid: result.paid,
+        payment_id: result.paymentId || null,
+        data: result
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/payment/cashfree-webhook
+   * Asynchronous Cashfree webhook handler (optional fast path; polling is authoritative)
+   */
+  async handleCashfreeWebhook(req, res, next) {
+    try {
+      const result = await paymentService.handleCashfreeWebhook({
+        rawBody: req.rawBody,
+        signature: req.headers['x-webhook-signature'],
+        timestamp: req.headers['x-webhook-timestamp'],
+        eventData: req.body
+      });
+
+      // Unverified webhook: do not process or dispatch anything
+      if (result && result.verified === false) {
+        return res.status(401).json(result);
+      }
+
+      // Auto-dispatch receipt only the first time a Cashfree QR order is marked paid, and only when enabled
+      if (result && result.newlyPaid && config.autoNotifyOnPayment) {
+        const amtStr = Number.isFinite(result.amount) ? `₹${result.amount.toFixed(2)}` : '₹(amount)';
+        try {
+          await notificationService.sendToRecipients({
+            subject: `Verified QR Payment: ${amtStr} Received (Cashfree)`,
+            message: `A Cashfree-verified QR payment of ${amtStr} was received and confirmed.\nPayment ID: ${result.paymentId}\nOrder ID: ${result.orderId}`,
+            metadata: {
+              Payment_ID: result.paymentId,
+              Order_ID: result.orderId,
+              Amount: amtStr,
+              Method: 'Cashfree Verified QR (UPI)',
+              Status: 'Paid & Verified',
+              Timestamp: new Date().toISOString()
+            }
+          });
+          console.log(`[PaymentController] Cashfree webhook auto-dispatched receipts for payment ${result.paymentId}`);
+        } catch (notifErr) {
+          console.warn(`[PaymentController] Cashfree webhook notification dispatch notice: ${notifErr.message}`);
+        }
+      }
+
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error(`[PaymentController] Cashfree webhook error: ${err.message}`);
+      return res.status(400).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
    * POST /api/payment/confirm-direct-upi
    * Confirms a direct UPI payment (e.g. user scanned QR and transferred ₹1),
    * updates status to 'paid', generates an official receipt, and auto-dispatches across the 3 channels.
@@ -379,6 +595,31 @@ class PaymentController {
             console.log(`[PaymentController] Webhook auto-dispatched receipts for payment ${payment.id}`);
           } catch (notifErr) {
             console.warn(`[PaymentController] Webhook notification dispatch notice: ${notifErr.message}`);
+          }
+        }
+      }
+
+      // Auto-dispatch receipt when a Razorpay-managed QR is credited (verified payment)
+      if (req.body?.event === 'qr_code.credited') {
+        const payment = req.body?.payload?.payment?.entity;
+        const qr = req.body?.payload?.qr_code?.entity;
+        if (payment) {
+          try {
+            await notificationService.sendToRecipients({
+              subject: `Verified QR Payment: ₹${(payment.amount / 100).toFixed(2)} Received`,
+              message: `A Razorpay-verified QR payment of ₹${(payment.amount / 100).toFixed(2)} was received and confirmed.\nPayment ID: ${payment.id}\nQR Code ID: ${qr?.id || 'N/A'}`,
+              metadata: {
+                Payment_ID: payment.id,
+                QR_Code_ID: qr?.id || 'N/A',
+                Amount: `₹${(payment.amount / 100).toFixed(2)}`,
+                Method: 'Razorpay Verified QR (UPI)',
+                Status: 'Credited & Verified',
+                Timestamp: new Date().toISOString()
+              }
+            });
+            console.log(`[PaymentController] Webhook auto-dispatched receipts for QR payment ${payment.id}`);
+          } catch (notifErr) {
+            console.warn(`[PaymentController] QR webhook notification dispatch notice: ${notifErr.message}`);
           }
         }
       }

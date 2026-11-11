@@ -4,14 +4,21 @@
  * Dynamic UPI QR code generation, countdown timers, and receipt printing.
  */
 
+// Local HTML-escape helper (mirrors escHtml in app.js / escHtmlNotif in notifications.js)
+function escHtmlPay(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
 class PaymentManager {
   constructor() {
-    this.selectedMethod = 'razorpay'; // 'razorpay' | 'upi_qr'
+    this.selectedMethod = 'razorpay'; // 'razorpay' | 'upi_qr' | 'razorpay_qr' | 'cashfree_qr'
     this.countdownTimer = null;
     this.remainingSeconds = 300; // 5 minutes
     this.currentOrder = null;
     this.lastTransaction = null;
     this.currentUpiData = null;
+    this.razorpayQrData = null;
+    this.razorpayQrPollTimer = null;
+    this.cashfreeQrData = null;
+    this.cashfreeQrPollTimer = null;
 
     this.initElements();
     this.bindEvents();
@@ -28,8 +35,26 @@ class PaymentManager {
     // Payment Method selection tabs/radios
     this.methodRazorpayBtn = document.getElementById('method-razorpay-btn');
     this.methodUpiQrBtn = document.getElementById('method-upiqr-btn');
+    this.methodRazorpayQrBtn = document.getElementById('method-razorpay-qr-btn');
     this.razorpayContainer = document.getElementById('razorpay-method-view');
     this.upiqrContainer = document.getElementById('upiqr-method-view');
+    this.razorpayQrContainer = document.getElementById('razorpay-qr-method-view');
+    this.methodCashfreeQrBtn = document.getElementById('method-cashfree-qr-btn');
+    this.cashfreeQrContainer = document.getElementById('cashfree-qr-method-view');
+
+    // Razorpay Verified QR Elements
+    this.btnGenerateRazorpayQr = document.getElementById('btn-generate-razorpay-qr');
+    this.razorpayQrImage = document.getElementById('razorpay-qr-image');
+    this.razorpayQrPlaceholder = document.getElementById('razorpay-qr-placeholder');
+    this.razorpayQrStatusBadge = document.getElementById('razorpay-qr-status');
+    this.razorpayQrIdText = document.getElementById('razorpay-qr-id');
+
+    // Cashfree Verified QR Elements
+    this.btnGenerateCashfreeQr = document.getElementById('btn-generate-cashfree-qr');
+    this.cashfreeQrImage = document.getElementById('cashfree-qr-image');
+    this.cashfreeQrPlaceholder = document.getElementById('cashfree-qr-placeholder');
+    this.cashfreeQrStatusBadge = document.getElementById('cashfree-qr-status');
+    this.cashfreeQrIdText = document.getElementById('cashfree-qr-id');
 
     // Razorpay Checkout Button
     this.btnPayRazorpay = document.getElementById('btn-pay-razorpay');
@@ -75,6 +100,23 @@ class PaymentManager {
     }
     if (this.methodUpiQrBtn) {
       this.methodUpiQrBtn.addEventListener('click', () => this.switchMethod('upi_qr'));
+    }
+    if (this.methodRazorpayQrBtn) {
+      this.methodRazorpayQrBtn.addEventListener('click', () => this.switchMethod('razorpay_qr'));
+    }
+
+    // Generate / regenerate Razorpay Verified QR
+    if (this.btnGenerateRazorpayQr) {
+      this.btnGenerateRazorpayQr.addEventListener('click', () => this.generateRazorpayQrCode());
+    }
+
+    if (this.methodCashfreeQrBtn) {
+      this.methodCashfreeQrBtn.addEventListener('click', () => this.switchMethod('cashfree_qr'));
+    }
+
+    // Generate / regenerate Cashfree Verified QR
+    if (this.btnGenerateCashfreeQr) {
+      this.btnGenerateCashfreeQr.addEventListener('click', () => this.generateCashfreeQrCode());
     }
 
     // Trigger Razorpay standard payment
@@ -148,6 +190,10 @@ class PaymentManager {
         if (gstEl) gstEl.textContent = `₹${gst.toFixed(2)}`;
         this.setPayButtonLoading(false);
         this.currentUpiData = null; // force QR regeneration on next switch
+        this.stopRazorpayQrPolling();
+        this.razorpayQrData = null; // force Razorpay QR regeneration on next switch
+        this.stopCashfreeQrPolling();
+        this.cashfreeQrData = null; // force Cashfree QR regeneration on next switch
       });
     }
 
@@ -169,27 +215,46 @@ class PaymentManager {
   switchMethod(method) {
     this.selectedMethod = method;
 
-    if (method === 'razorpay') {
-      this.methodRazorpayBtn.classList.add('border-blue-600', 'bg-blue-50/50', 'dark:bg-blue-900/20');
-      this.methodRazorpayBtn.classList.remove('border-slate-200', 'dark:border-slate-700');
-      this.methodUpiQrBtn.classList.remove('border-blue-600', 'bg-blue-50/50', 'dark:bg-blue-900/20');
-      this.methodUpiQrBtn.classList.add('border-slate-200', 'dark:border-slate-700');
+    // Stop live Razorpay QR polling whenever we leave that tab
+    if (method !== 'razorpay_qr') {
+      this.stopRazorpayQrPolling();
+    }
+    if (method !== 'cashfree_qr') {
+      this.stopCashfreeQrPolling();
+    }
 
-      this.razorpayContainer.classList.remove('hidden');
-      this.upiqrContainer.classList.add('hidden');
-    } else {
-      this.methodUpiQrBtn.classList.add('border-blue-600', 'bg-blue-50/50', 'dark:bg-blue-900/20');
-      this.methodUpiQrBtn.classList.remove('border-slate-200', 'dark:border-slate-700');
-      this.methodRazorpayBtn.classList.remove('border-blue-600', 'bg-blue-50/50', 'dark:bg-blue-900/20');
-      this.methodRazorpayBtn.classList.add('border-slate-200', 'dark:border-slate-700');
+    const activeClasses = ['border-blue-600', 'bg-blue-50/50', 'dark:bg-blue-900/20'];
+    const inactiveClasses = ['border-slate-200', 'dark:border-slate-700'];
 
-      this.razorpayContainer.classList.add('hidden');
-      this.upiqrContainer.classList.remove('hidden');
+    const tabs = [
+      { btn: this.methodRazorpayBtn, view: this.razorpayContainer, key: 'razorpay' },
+      { btn: this.methodUpiQrBtn, view: this.upiqrContainer, key: 'upi_qr' },
+      { btn: this.methodRazorpayQrBtn, view: this.razorpayQrContainer, key: 'razorpay_qr' },
+      { btn: this.methodCashfreeQrBtn, view: this.cashfreeQrContainer, key: 'cashfree_qr' }
+    ];
 
-      // Auto generate UPI QR if not generated yet
-      if (!this.currentUpiData) {
-        this.generateUpiQrCode();
+    tabs.forEach(({ btn, view, key }) => {
+      if (!btn || !view) return;
+      if (key === method) {
+        btn.classList.add(...activeClasses);
+        btn.classList.remove(...inactiveClasses);
+        view.classList.remove('hidden');
+      } else {
+        btn.classList.remove(...activeClasses);
+        btn.classList.add(...inactiveClasses);
+        view.classList.add('hidden');
       }
+    });
+
+    // Auto generate the relevant QR the first time its tab is opened
+    if (method === 'upi_qr' && !this.currentUpiData) {
+      this.generateUpiQrCode();
+    }
+    if (method === 'razorpay_qr' && !this.razorpayQrData) {
+      this.generateRazorpayQrCode();
+    }
+    if (method === 'cashfree_qr' && !this.cashfreeQrData) {
+      this.generateCashfreeQrCode();
     }
   }
 
@@ -499,6 +564,321 @@ class PaymentManager {
         lucide.createIcons();
       }
     }
+  }
+
+  /**
+   * Generate a Razorpay-managed VERIFIED dynamic QR (QR Codes API).
+   * Unlike Direct UPI QR, payment is confirmed automatically via webhook + status polling.
+   */
+  async generateRazorpayQrCode() {
+    this.stopRazorpayQrPolling();
+
+    if (this.btnGenerateRazorpayQr) {
+      this.btnGenerateRazorpayQr.disabled = true;
+      this.btnGenerateRazorpayQr.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i> Generating...`;
+      lucide.createIcons();
+    }
+
+    // Reset display to a pending state
+    if (this.razorpayQrImage) {
+      this.razorpayQrImage.classList.add('hidden');
+      this.razorpayQrImage.removeAttribute('src');
+    }
+    if (this.razorpayQrPlaceholder) {
+      this.razorpayQrPlaceholder.classList.remove('hidden');
+      this.razorpayQrPlaceholder.textContent = 'Generating secure QR…';
+    }
+    if (this.razorpayQrIdText) this.razorpayQrIdText.textContent = '—';
+    this.setRazorpayQrStatus('pending', 'Waiting for payment…');
+
+    try {
+      const amount = this.getAmount();
+      const result = await window.apiService.generateRazorpayQr(amount, `Payment of ₹${amount.toFixed(2)}`);
+
+      if (!result || result.success === false) {
+        const msg = (result && result.message) || 'Could not generate Razorpay verified QR.';
+        window.app.showToast('error', 'Razorpay QR Unavailable', msg);
+        if (this.razorpayQrPlaceholder) this.razorpayQrPlaceholder.textContent = 'QR unavailable';
+        this.setRazorpayQrStatus('failed', 'Unavailable');
+        this.razorpayQrData = null;
+        return;
+      }
+
+      this.razorpayQrData = result;
+
+      // Server-provided image URL assigned via .src (not innerHTML) — not an injection vector
+      if (this.razorpayQrImage && result.qr_image_url) {
+        this.razorpayQrImage.src = result.qr_image_url;
+        this.razorpayQrImage.classList.remove('hidden');
+        if (this.razorpayQrPlaceholder) this.razorpayQrPlaceholder.classList.add('hidden');
+      }
+      // qr_id rendered via textContent — safe from server values
+      if (this.razorpayQrIdText) this.razorpayQrIdText.textContent = result.qr_id || '—';
+
+      window.app.showToast('success', 'Verified QR Ready', 'Scan to pay — confirmation is automatic, no manual tap needed.');
+
+      this.startRazorpayQrPolling(result.qr_id, amount);
+    } catch (e) {
+      console.error('Error generating Razorpay QR:', e);
+      window.app.showToast('error', 'QR Error', 'Could not generate Razorpay verified QR.');
+      this.setRazorpayQrStatus('failed', 'Error');
+      this.razorpayQrData = null;
+    } finally {
+      if (this.btnGenerateRazorpayQr) {
+        this.btnGenerateRazorpayQr.disabled = false;
+        this.btnGenerateRazorpayQr.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i> Regenerate QR`;
+        lucide.createIcons();
+      }
+    }
+  }
+
+  /**
+   * Poll the backend for Razorpay QR payment confirmation every ~4 seconds.
+   */
+  startRazorpayQrPolling(qrId, amount) {
+    this.stopRazorpayQrPolling();
+    if (!qrId) return;
+
+    let elapsed = 0;
+    const intervalMs = 4000;
+    const maxMs = 10 * 60 * 1000; // stop after 10 minutes
+
+    const poll = async () => {
+      // Abort if the user left this tab or regenerated a different QR
+      if (this.selectedMethod !== 'razorpay_qr' || !this.razorpayQrData || this.razorpayQrData.qr_id !== qrId) {
+        this.stopRazorpayQrPolling();
+        return;
+      }
+
+      try {
+        const status = await window.apiService.getRazorpayQrStatus(qrId);
+        if (status && status.paid) {
+          this.stopRazorpayQrPolling();
+          this.onRazorpayQrPaid(status, qrId, amount);
+          return;
+        }
+      } catch (e) {
+        console.warn('[Payment] Razorpay QR poll error', e);
+      }
+
+      elapsed += intervalMs;
+      if (elapsed >= maxMs) {
+        this.stopRazorpayQrPolling();
+        this.setRazorpayQrStatus('failed', 'Session timed out — regenerate QR');
+      }
+    };
+
+    this.razorpayQrPollTimer = setInterval(poll, intervalMs);
+  }
+
+  stopRazorpayQrPolling() {
+    if (this.razorpayQrPollTimer) {
+      clearInterval(this.razorpayQrPollTimer);
+      this.razorpayQrPollTimer = null;
+    }
+  }
+
+  /**
+   * Called once a Razorpay QR payment is verified: show success state + receipt.
+   */
+  onRazorpayQrPaid(status, qrId, amount) {
+    this.setRazorpayQrStatus('paid', 'Payment received & verified');
+
+    const txn = {
+      id: status.payment_id || qrId,
+      receipt_id: `RCPT_RZPQR_${String(qrId || '').slice(-8).toUpperCase()}`,
+      payment_id: status.payment_id || 'razorpay_qr_verified',
+      order_id: qrId,
+      amount,
+      method: 'Razorpay Verified QR',
+      created_at: new Date().toISOString()
+    };
+
+    window.apiService.logPaymentRecord(txn);
+    this.showReceipt(txn);
+    window.app.showToast('success', `₹${amount.toFixed(2)} Verified!`, 'Razorpay confirmed your QR payment. Receipt generated.');
+    window.app.playTone('success');
+    window.app.refreshHistory();
+  }
+
+  /**
+   * Update the Razorpay QR live status pill (pending | paid | failed).
+   */
+  setRazorpayQrStatus(state, text) {
+    if (!this.razorpayQrStatusBadge) return;
+    const base = 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ';
+    let colorCls, iconHtml;
+    if (state === 'paid') {
+      colorCls = 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400';
+      iconHtml = '<i data-lucide="check-circle-2" class="w-3.5 h-3.5 mr-1.5"></i>';
+    } else if (state === 'failed') {
+      colorCls = 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400';
+      iconHtml = '<i data-lucide="x-circle" class="w-3.5 h-3.5 mr-1.5"></i>';
+    } else {
+      colorCls = 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400';
+      iconHtml = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i>';
+    }
+    this.razorpayQrStatusBadge.className = base + colorCls;
+    this.razorpayQrStatusBadge.innerHTML = `${iconHtml}<span>${escHtmlPay(text)}</span>`;
+    lucide.createIcons();
+  }
+
+  /**
+   * Generate a Cashfree-managed VERIFIED dynamic UPI QR (order + UPI qrcode session).
+   * Payment is confirmed automatically via status polling (Cashfree order payments API).
+   */
+  async generateCashfreeQrCode() {
+    this.stopCashfreeQrPolling();
+
+    if (this.btnGenerateCashfreeQr) {
+      this.btnGenerateCashfreeQr.disabled = true;
+      this.btnGenerateCashfreeQr.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i> Generating...`;
+      lucide.createIcons();
+    }
+
+    // Reset display to a pending state
+    if (this.cashfreeQrImage) {
+      this.cashfreeQrImage.classList.add('hidden');
+      this.cashfreeQrImage.removeAttribute('src');
+    }
+    if (this.cashfreeQrPlaceholder) {
+      this.cashfreeQrPlaceholder.classList.remove('hidden');
+      this.cashfreeQrPlaceholder.textContent = 'Generating secure QR…';
+    }
+    if (this.cashfreeQrIdText) this.cashfreeQrIdText.textContent = '—';
+    this.setCashfreeQrStatus('pending', 'Waiting for payment…');
+
+    try {
+      const amount = this.getAmount();
+      const result = await window.apiService.generateCashfreeQr(amount, `Payment of ₹${amount.toFixed(2)}`);
+
+      if (!result || result.success === false) {
+        const msg = (result && result.message) || 'Could not generate Cashfree verified QR.';
+        window.app.showToast('error', 'Cashfree QR Unavailable', msg);
+        if (this.cashfreeQrPlaceholder) this.cashfreeQrPlaceholder.textContent = 'QR unavailable';
+        this.setCashfreeQrStatus('failed', 'Unavailable');
+        this.cashfreeQrData = null;
+        return;
+      }
+
+      this.cashfreeQrData = result;
+
+      // Server-provided data:image/png;base64 URI assigned via .src as-is (not innerHTML)
+      if (this.cashfreeQrImage && result.qr_image_url) {
+        this.cashfreeQrImage.src = result.qr_image_url;
+        this.cashfreeQrImage.classList.remove('hidden');
+        if (this.cashfreeQrPlaceholder) this.cashfreeQrPlaceholder.classList.add('hidden');
+      }
+      // order_id rendered via textContent — safe from server values
+      if (this.cashfreeQrIdText) this.cashfreeQrIdText.textContent = result.order_id || '—';
+
+      window.app.showToast('success', 'Cashfree QR Ready', 'Scan to pay — confirmation is automatic, no manual tap needed.');
+
+      this.startCashfreeQrPolling(result.order_id, amount);
+    } catch (e) {
+      console.error('Error generating Cashfree QR:', e);
+      window.app.showToast('error', 'QR Error', 'Could not generate Cashfree verified QR.');
+      this.setCashfreeQrStatus('failed', 'Error');
+      this.cashfreeQrData = null;
+    } finally {
+      if (this.btnGenerateCashfreeQr) {
+        this.btnGenerateCashfreeQr.disabled = false;
+        this.btnGenerateCashfreeQr.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i> Regenerate QR`;
+        lucide.createIcons();
+      }
+    }
+  }
+
+  /**
+   * Poll the backend for Cashfree QR payment confirmation every ~4 seconds.
+   */
+  startCashfreeQrPolling(orderId, amount) {
+    this.stopCashfreeQrPolling();
+    if (!orderId) return;
+
+    let elapsed = 0;
+    const intervalMs = 4000;
+    const maxMs = 10 * 60 * 1000; // stop after 10 minutes
+
+    const poll = async () => {
+      // Abort if the user left this tab or regenerated a different QR
+      if (this.selectedMethod !== 'cashfree_qr' || !this.cashfreeQrData || this.cashfreeQrData.order_id !== orderId) {
+        this.stopCashfreeQrPolling();
+        return;
+      }
+
+      try {
+        const status = await window.apiService.getCashfreeQrStatus(orderId);
+        // Re-check after the await: a stale response must not fire for a replaced QR
+        if (status && status.paid && this.cashfreeQrData && this.cashfreeQrData.order_id === orderId) {
+          this.stopCashfreeQrPolling();
+          this.onCashfreeQrPaid(status, orderId, amount);
+          return;
+        }
+      } catch (e) {
+        console.warn('[Payment] Cashfree QR poll error', e);
+      }
+
+      elapsed += intervalMs;
+      if (elapsed >= maxMs) {
+        this.stopCashfreeQrPolling();
+        this.setCashfreeQrStatus('failed', 'Session timed out — regenerate QR');
+      }
+    };
+
+    this.cashfreeQrPollTimer = setInterval(poll, intervalMs);
+  }
+
+  stopCashfreeQrPolling() {
+    if (this.cashfreeQrPollTimer) {
+      clearInterval(this.cashfreeQrPollTimer);
+      this.cashfreeQrPollTimer = null;
+    }
+  }
+
+  /**
+   * Called once a Cashfree QR payment is verified: show success state + receipt.
+   */
+  onCashfreeQrPaid(status, orderId, amount) {
+    this.setCashfreeQrStatus('paid', 'Payment received & verified');
+
+    const txn = {
+      id: status.payment_id || orderId,
+      receipt_id: `RCPT_CFQR_${String(orderId || '').slice(-8).toUpperCase()}`,
+      payment_id: status.payment_id || 'cashfree_qr_verified',
+      order_id: orderId,
+      amount,
+      method: 'Cashfree Verified QR',
+      created_at: new Date().toISOString()
+    };
+
+    window.apiService.logPaymentRecord(txn);
+    this.showReceipt(txn);
+    window.app.showToast('success', `₹${amount.toFixed(2)} Verified!`, 'Cashfree confirmed your QR payment. Receipt generated.');
+    window.app.playTone('success');
+    window.app.refreshHistory();
+  }
+
+  /**
+   * Update the Cashfree QR live status pill (pending | paid | failed).
+   */
+  setCashfreeQrStatus(state, text) {
+    if (!this.cashfreeQrStatusBadge) return;
+    const base = 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ';
+    let colorCls, iconHtml;
+    if (state === 'paid') {
+      colorCls = 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400';
+      iconHtml = '<i data-lucide="check-circle-2" class="w-3.5 h-3.5 mr-1.5"></i>';
+    } else if (state === 'failed') {
+      colorCls = 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400';
+      iconHtml = '<i data-lucide="x-circle" class="w-3.5 h-3.5 mr-1.5"></i>';
+    } else {
+      colorCls = 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400';
+      iconHtml = '<i data-lucide="loader-2" class="w-3.5 h-3.5 mr-1.5 animate-spin"></i>';
+    }
+    this.cashfreeQrStatusBadge.className = base + colorCls;
+    this.cashfreeQrStatusBadge.innerHTML = `${iconHtml}<span>${escHtmlPay(text)}</span>`;
+    lucide.createIcons();
   }
 
   /**
