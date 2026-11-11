@@ -430,6 +430,20 @@ class NotificationsManager {
       const toastType = failCount === allResults.length ? 'error' : sentCount > 0 ? 'success' : 'warning';
       window.app.showToast(toastType, 'Broadcast Complete', summary.join(', ') + '.');
       window.app.playTone('success');
+
+      // Persist dispatch results to the audit log (streaming path must log too)
+      const batchId = `BATCH-${Date.now().toString(36).toUpperCase()}`;
+      window.apiService._logNotificationBatch(allResults.map(r => ({
+        batch_id: batchId,
+        recipientName: r.recipientName || r.recipient_name,
+        target: r.target || r.recipient_target || '',
+        channel: r.channel,
+        subject: subject,
+        status: r.status,
+        error: r.error,
+        notice: r.detail || r.notice
+      })));
+
       window.app.refreshHistory();
     } catch (err) {
       console.error('Dispatch failed:', err);
