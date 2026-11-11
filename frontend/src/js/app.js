@@ -32,6 +32,11 @@ class AppController {
   constructor() {
     this.currentTab = 'checkout';
     this.audioCtx = null;
+    // Per-table sort state (default: newest first)
+    this.historySort = {
+      payments: { key: 'created_at', dir: 'desc' },
+      notifs: { key: 'timestamp', dir: 'desc' }
+    };
 
     this.initTheme();
     this.initElements();
@@ -137,6 +142,24 @@ class AppController {
     if (this.historyStatusFilter) {
       this.historyStatusFilter.addEventListener('change', () => this.renderHistoryTables());
     }
+
+    // Sortable column headers
+    ['payments', 'notifs'].forEach(table => {
+      const thead = document.getElementById(`${table}-thead`);
+      if (!thead) return;
+      thead.addEventListener('click', (e) => {
+        const th = e.target.closest('th[data-sort]');
+        if (!th) return;
+        const state = this.historySort[table];
+        if (state.key === th.dataset.sort) {
+          state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.key = th.dataset.sort;
+          state.dir = 'asc';
+        }
+        this.renderHistoryTables();
+      });
+    });
 
     // Export CSV
     if (this.btnExportCsv) {
@@ -273,20 +296,50 @@ class AppController {
     this.renderHistoryTables();
   }
 
+  // Returns a sorted copy of rows per this.historySort[table] and refreshes header arrows
+  sortHistoryRows(table, rows) {
+    const { key, dir } = this.historySort[table];
+    const getVal = (r) => {
+      if (key === 'created_at' || key === 'timestamp') return new Date(r[key]).getTime() || 0;
+      if (key === 'amount') return Number(r.amount) || 0;
+      if (key === 'receipt_id') return String(r.receipt_id || r.id || '').toLowerCase();
+      return String(r[key] ?? '').toLowerCase();
+    };
+    const mult = dir === 'asc' ? 1 : -1;
+    const sorted = [...rows].sort((a, b) => {
+      const va = getVal(a), vb = getVal(b);
+      return va < vb ? -mult : va > vb ? mult : 0;
+    });
+
+    const thead = document.getElementById(`${table}-thead`);
+    if (thead) {
+      thead.querySelectorAll('th[data-sort]').forEach(th => {
+        const active = th.dataset.sort === key;
+        const ind = th.querySelector('.sort-indicator');
+        if (ind) {
+          ind.textContent = active ? (dir === 'asc' ? '↑' : '↓') : '↕';
+          ind.className = `sort-indicator ml-1 ${active ? 'text-blue-600 dark:text-blue-400' : 'opacity-30'}`;
+        }
+        th.setAttribute('aria-sort', active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none');
+      });
+    }
+    return sorted;
+  }
+
   renderHistoryTables() {
     const searchTerm = (this.historySearchInput ? this.historySearchInput.value : '').toLowerCase();
     const statusFilter = this.historyStatusFilter ? this.historyStatusFilter.value : 'all';
 
     // 1. Render Payments Table
     const payments = window.apiService.getPaymentHistory();
-    const filteredPayments = payments.filter(p => {
+    const filteredPayments = this.sortHistoryRows('payments', payments.filter(p => {
       const matchesSearch = !searchTerm || 
         (p.payment_id && p.payment_id.toLowerCase().includes(searchTerm)) ||
         (p.order_id && p.order_id.toLowerCase().includes(searchTerm)) ||
         (p.method && p.method.toLowerCase().includes(searchTerm));
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
       return matchesSearch && matchesStatus;
-    });
+    }));
 
     const paymentsTbody = document.getElementById('payments-tbody');
     if (paymentsTbody) {
@@ -341,7 +394,7 @@ class AppController {
 
     // 2. Render Notifications Table
     const notifs = window.apiService.getNotificationHistory();
-    const filteredNotifs = notifs.filter(n => {
+    const filteredNotifs = this.sortHistoryRows('notifs', notifs.filter(n => {
       const matchesSearch = !searchTerm ||
         (n.recipient_name && n.recipient_name.toLowerCase().includes(searchTerm)) ||
         (n.recipient_target && n.recipient_target.toLowerCase().includes(searchTerm)) ||
@@ -349,7 +402,7 @@ class AppController {
         (n.subject && n.subject.toLowerCase().includes(searchTerm));
       const matchesStatus = statusFilter === 'all' || n.status === statusFilter;
       return matchesSearch && matchesStatus;
-    });
+    }));
 
     const notifsTbody = document.getElementById('notifs-tbody');
     if (notifsTbody) {

@@ -855,15 +855,15 @@
 
       <!-- Table 1: Payments View -->
       <div id="table-payments-view" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="overflow-auto max-h-[400px]">
           <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
-                <th class="px-6 py-3.5">Receipt / Txn ID</th>
-                <th class="px-6 py-3.5">Timestamp</th>
-                <th class="px-6 py-3.5">Method</th>
-                <th class="px-6 py-3.5">Amount</th>
-                <th class="px-6 py-3.5">Status</th>
+            <thead id="payments-thead" class="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800 shadow-[0_1px_0_0_rgb(226,232,240)] dark:shadow-[0_1px_0_0_rgb(30,41,59)]">
+              <tr class="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
+                <th data-sort="receipt_id" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Receipt / Txn ID <span class="sort-indicator"></span></th>
+                <th data-sort="created_at" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Timestamp <span class="sort-indicator"></span></th>
+                <th data-sort="method" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Method <span class="sort-indicator"></span></th>
+                <th data-sort="amount" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Amount <span class="sort-indicator"></span></th>
+                <th data-sort="status" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Status <span class="sort-indicator"></span></th>
                 <th class="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
@@ -876,16 +876,16 @@
 
       <!-- Table 2: Notifications View -->
       <div id="table-notifs-view" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden hidden">
-        <div class="overflow-x-auto">
+        <div class="overflow-auto max-h-[400px]">
           <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
-                <th class="px-6 py-3.5">Time</th>
-                <th class="px-6 py-3.5">Recipient</th>
-                <th class="px-6 py-3.5">Channel</th>
-                <th class="px-6 py-3.5">Subject / Message</th>
-                <th class="px-6 py-3.5">Status</th>
-                <th class="px-6 py-3.5">Delivery Details</th>
+            <thead id="notifs-thead" class="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800 shadow-[0_1px_0_0_rgb(226,232,240)] dark:shadow-[0_1px_0_0_rgb(30,41,59)]">
+              <tr class="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
+                <th data-sort="timestamp" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Time <span class="sort-indicator"></span></th>
+                <th data-sort="recipient_name" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Recipient <span class="sort-indicator"></span></th>
+                <th data-sort="channel" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Channel <span class="sort-indicator"></span></th>
+                <th data-sort="subject" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Subject / Message <span class="sort-indicator"></span></th>
+                <th data-sort="status" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Status <span class="sort-indicator"></span></th>
+                <th data-sort="detail" class="px-6 py-3.5 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200">Delivery Details <span class="sort-indicator"></span></th>
               </tr>
             </thead>
             <tbody id="notifs-tbody" class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -987,13 +987,6 @@
   <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col space-y-3 pointer-events-none max-w-sm w-full"></div>
 
   <!-- Footer -->
-  <footer class="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 py-4">
-    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 dark:text-slate-400">
-      <span>QuickPay & Notify Studio â€¢ Powered by Razorpay Standard Checkout & Multi-Channel Dispatch Engine</span>
-      <span class="mx-2">â€¢</span>
-      <span>Sender: <strong class="text-slate-700 dark:text-slate-300 font-mono">ravi123sehravat@gmail.com</strong></span>
-    </div>
-  </footer>
 
   <!-- Application Scripts -->
   <script src="src/js/api.js?v=3"></script>
